@@ -273,29 +273,15 @@ document.getElementById('logs-buscar').addEventListener('click', async () => {
   resEl.innerHTML = '<div style="color:var(--tx2)">⏳ Buscando...</div>';
 
   try {
-    // v1.7.8 — voltou ao fetch direto Supabase (v1.5) — mais simples, dispensa workflow
-    const SUPABASE_KEY = '';
-    const baseUrl = 'https://carajasnet-supabase.bwadmr.easypanel.host/rest/v1/ixc_logs';
-
-    const params = new URLSearchParams();
-    params.set('order', 'criado_em.desc');
-    params.set('limit', '50');
-
-    if (cpf && usuario) {
-      params.set('contrato_id',   `eq.${cpf}`);
-      params.set('usuario_login', `ilike.*${usuario}*`);
-    } else if (cpf) {
-      // OR: contrato_id OU cliente_id
-      params.set('or', `(contrato_id.eq.${cpf},cliente_id.eq.${cpf})`);
-    } else if (usuario) {
-      params.set('usuario_login', `ilike.*${usuario}*`);
-    }
-
-    const res = await fetch(`${baseUrl}?${params.toString()}`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    // PWA — logs via n8n (sem anon key); o servidor valida supervisor
+    const email = sessaoAtual?.usuario_email || sessaoAtual?.usuario_login || '';
+    const res = await fetch('https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-gestao-pwa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, modo: 'logs', cpf, usuario })
     });
-    const logs = await res.json();
-    logsCache = Array.isArray(logs) ? logs : [];
+    const resp = await res.json();
+    const logs = Array.isArray(resp?.logs) ? resp.logs : [];
+    logsCache = logs;
     logsFiltroCache = [cpf && ('contrato/cliente: '+cpf), usuario && ('colaborador: '+usuario)].filter(Boolean).join(' · ') || 'sem filtro';
 
     if (!logs?.length) {
@@ -399,13 +385,14 @@ async function carregarGestao(periodo) {
   if (!el) return;
   el.innerHTML = '⏳ Carregando...';
   try {
-    const since = gestaoSinceISO(periodo);
-    const headers = { apikey: GESTAO_KEY, Authorization: `Bearer ${GESTAO_KEY}` };
-    const sel = 'usuario_login,usuario_nome,usuario_id,acao,sucesso,criado_em';
-    const mkUrl = comVer => `${GESTAO_LOGS_URL}?select=${sel}${comVer?',extensao_versao':''}&criado_em=gte.${since}&order=criado_em.desc&limit=10000`;
-    let res = await fetch(mkUrl(true), { headers });
-    if (!res.ok) res = await fetch(mkUrl(false), { headers }); // coluna extensao_versao pode não existir ainda
-    const logs = await res.json();
+    // PWA — Uso via n8n (sem anon key); o servidor valida supervisor
+    const email = sessaoAtual?.usuario_email || sessaoAtual?.usuario_login || '';
+    const res = await fetch('https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-gestao-pwa', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, modo: 'uso', periodo })
+    });
+    const resp = await res.json();
+    const logs = Array.isArray(resp?.logs) ? resp.logs : [];
     if (!Array.isArray(logs) || !logs.length) { gestaoAgregadoCache = null; el.innerHTML = '<div class="empty">Nenhuma atividade no período.</div>'; return; }
     const ag = agregarGestao(logs);
     gestaoAgregadoCache = { ag, periodo };

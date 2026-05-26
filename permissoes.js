@@ -43,8 +43,9 @@
   const ACOES = ['copiar-tudo', 'desbloquear', 'desconectar', 'reboot-onu', 'abrir-agendar', 'enviar-boleto-email', 'boleto', 'roteador', 'potencia-onu'];
   const ORDEM_ABAS = ['geral', 'conexao', 'financas', 'atendimento', 'historicos', 'servicos'];
 
-  let permitido = null;     // null = tudo liberado
+  let permitido = null;      // null = tudo liberado
   let loadedFor = undefined; // e-mail para o qual já carregamos
+  let supervisorPWA = false; // se o usuário é supervisor (mostra Gestão)
 
   function getSessao() {
     return new Promise(r => chrome.storage.local.get(['ixc_sessao'], d => r(d.ixc_sessao || null)));
@@ -59,12 +60,13 @@
 
   async function carregar(email) {
     try {
-      if (!email) { permitido = null; return; }
+      if (!email) { permitido = null; supervisorPWA = false; return; }
       const res = await fetch(PERFIL_URL, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       });
       const d = await res.json();
+      supervisorPWA = !!(d && d.supervisor === true);
       let raw = d ? d.permissoes : null;
       if (raw == null || raw === '') { permitido = null; return; } // sem config = acesso total
       // Aceita: array JSON ["a","b"], string JSON "a", texto simples a, ou "a,b,c"
@@ -74,8 +76,14 @@
       }
       if (typeof raw === 'string') raw = raw.split(',').map(x => x.trim()).filter(Boolean);
       permitido = Array.isArray(raw) ? raw.map(x => String(x).trim()) : (raw != null ? [String(raw)] : null);
-      console.log('[IXC permissoes] usuário:', email, '| permitido:', permitido);
-    } catch (e) { permitido = null; }
+      console.log('[IXC permissoes] usuário:', email, '| permitido:', permitido, '| supervisor:', supervisorPWA);
+    } catch (e) { permitido = null; supervisorPWA = false; }
+  }
+
+  // Botão Gestão: visível só p/ supervisor (independe de 'permitido')
+  function aplicarGestaoBtn() {
+    const bg = document.getElementById('btn-gestao');
+    if (bg) bg.style.display = supervisorPWA ? '' : 'none';
   }
 
   function ensureStyle() {
@@ -130,15 +138,13 @@
   let aplicando = false;
   async function ciclo() {
     if (aplicando) return; aplicando = true;
-    try { await ensureLoaded(); aplicar(); } finally { aplicando = false; }
+    try { await ensureLoaded(); aplicarGestaoBtn(); aplicar(); } finally { aplicando = false; }
   }
 
   window.addEventListener('load', async () => {
     await ciclo();
-    const alvo = document.getElementById('results');
-    if (alvo) {
-      const obs = new MutationObserver(() => { ciclo(); });
-      obs.observe(alvo, { childList: true, subtree: true });
-    }
+    // Observa o body inteiro: pega o login (mostra o header/Gestão) e cada busca (cards)
+    const obs = new MutationObserver(() => { ciclo(); });
+    obs.observe(document.body, { childList: true, subtree: true });
   });
 })();
