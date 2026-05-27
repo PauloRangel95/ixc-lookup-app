@@ -1,0 +1,33 @@
+Política de Privacidade — Extensão IXC Lookup
+Última atualização: 27/05/2026
+
+1. Quem somos
+A extensão IXC Lookup é uma ferramenta interna desenvolvida por/para CarajásNet / REDE DE TELECOMUNICAÇÕES CARAJÁS LTDA ("nós"), destinada exclusivamente ao uso dos colaboradores autorizados da empresa para fins de atendimento e operação.
+
+2. Dados que coletamos
+Para funcionar, a extensão processa e transmite, aos servidores internos da empresa:
+
+Dados do colaborador: login, nome, e-mail corporativo e um token de sessão. A senha digitada no login não é armazenada nem transmitida em texto puro — é convertida em um resumo criptográfico (SHA-256) antes do envio.
+Registros de auditoria (logs): identificação do colaborador e das ações realizadas (consultas, desbloqueios, leituras), incluindo identificadores de contrato/cliente e data/hora, para controle interno.
+Dados operacionais consultados: informações de contratos, clientes, ordens de serviço, boletos e equipamentos de rede, obtidos sob demanda dos sistemas internos.
+3. Como usamos os dados
+Os dados são usados somente para: autenticar o colaborador, exibir as informações consultadas e manter registro de auditoria interno das operações. Não vendemos, alugamos nem compartilhamos dados com terceiros para publicidade ou qualquer finalidade alheia à operação da empresa.
+
+4. Onde os dados ficam
+
+Localmente (no seu navegador): apenas a sessão ativa e preferências de interface (tema, faixas de sinal). Esses dados são apagados ao deslogar.
+Em servidores internos da empresa: autenticação (n8n), logs de auditoria (Supabase) e gestão da rede óptica (OLT Cloud), todos sob controle da CarajásNet.
+5. Compartilhamento com terceiros
+Nenhum dado é compartilhado com terceiros, exceto os provedores de infraestrutura que hospedam os servidores internos, estritamente para a operação do serviço.
+
+6. Retenção
+Os dados de sessão são removidos do navegador ao encerrar a sessão. Os logs de auditoria são mantidos enquanto necessários para fins de controle interno da empresa.
+
+7. Segurança
+As comunicações são feitas via HTTPS. A senha do colaborador trafega apenas em formato de resumo criptográfico (hash).
+
+8. Seus direitos
+Como colaborador, você pode solicitar informações sobre seus dados ou correções entrando em contato pelo canal abaixo.
+
+9. Contato
+Dúvidas sobre esta política: dev@carajasnet.com.
