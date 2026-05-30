@@ -787,6 +787,18 @@ function tempCls(v){
   return 'verde';
 }
 
+// Respeita a visão do colaborador: o "copiar tudo" só inclui as seções cujo card
+// NÃO foi escondido pela camada de permissões (permissoes.js). Verifica apenas a
+// classe .ixc-perm-hidden — o display:none de troca de aba é navegação normal e
+// não restringe acesso. Card ausente nesta consulta => não restringe.
+function _secaoPermitida(cardId) {
+  const body = document.getElementById('body-' + cardId);
+  if (!body) return true;
+  const card = body.closest('.card');
+  if (!card) return true;
+  return !card.classList.contains('ixc-perm-hidden');
+}
+
 function copiarTudo() {
   const d = dadosAtual;
   if (!d) return;
@@ -796,9 +808,10 @@ function copiarTudo() {
 
   L.push('==============================');
   L.push('Cliente: ' + cl.nome);
-  L.push('CPF/CNPJ: ' + (cl.cpf||'---'));
+  if (_secaoPermitida('cliente')) L.push('CPF/CNPJ: ' + (cl.cpf||'---'));
   L.push('==============================');
 
+  if (_secaoPermitida('contrato')) {
   L.push('');
   L.push('-- CONTRATO --');
   L.push('N contrato: ' + c.numero);
@@ -814,22 +827,25 @@ function copiarTudo() {
   if (c.data_expiracao) L.push('Expiração: ' + c.data_expiracao);
   if (c.fidelidade) L.push('Fidelidade: ' + c.fidelidade + ' meses');
   if (c.desbloqueio_conf) L.push('Desbl. conf.: ' + c.desbloqueio_conf);
+  }
 
-  if ((d.acrescimos && d.acrescimos.length) || (d.descontos && d.descontos.length)) {
+  if (_secaoPermitida('fin-ajustes') && ((d.acrescimos && d.acrescimos.length) || (d.descontos && d.descontos.length))) {
     L.push('');
     L.push('-- ACRÉSCIMOS / DESCONTOS --');
     (d.acrescimos||[]).forEach(function(x){ L.push('Acréscimo: + R$ ' + (x.valor||'-') + (x.descricao?' - '+x.descricao:'')); });
     (d.descontos||[]).forEach(function(x){ L.push('Desconto: - R$ ' + (x.valor||'-') + (x.descricao?' - '+x.descricao:'')); });
   }
 
+  if (_secaoPermitida('cliente')) {
   L.push('');
   L.push('-- CLIENTE --');
   if (cl.whatsapp||cl.celular) L.push('WhatsApp/Cel: ' + (cl.whatsapp||cl.celular));
   if (cl.telefone) L.push('Telefone: ' + cl.telefone);
   if (cl.email)    L.push('E-mail: ' + cl.email);
   if (cl.endereco) L.push('Endereco: ' + cl.endereco);
+  }
 
-  if (d.logins && d.logins.length) {
+  if (_secaoPermitida('logins') && d.logins && d.logins.length) {
     L.push('');
     L.push('-- LOGINS PPPoE --');
     d.logins.forEach(function(l) {
@@ -840,7 +856,7 @@ function copiarTudo() {
     });
   }
 
-  if (fin && fin.titulos && fin.titulos.length) {
+  if (_secaoPermitida('fin') && fin && fin.titulos && fin.titulos.length) {
     L.push('');
     L.push('-- FINANCEIRO --');
     var SF = {A:'Em aberto',C:'Pago',B:'Baixado',P:'Pago parcial'};
@@ -850,7 +866,7 @@ function copiarTudo() {
     });
   }
 
-  if (d.os_abertas && d.os_abertas.length) {
+  if (_secaoPermitida('os-ab') && d.os_abertas && d.os_abertas.length) {
     L.push('');
     L.push('-- OS ABERTAS --');
     d.os_abertas.forEach(function(o) {
@@ -858,7 +874,7 @@ function copiarTudo() {
     });
   }
 
-  if (d.os_encerradas && d.os_encerradas.length) {
+  if (_secaoPermitida('os-en') && d.os_encerradas && d.os_encerradas.length) {
     L.push('');
     L.push('-- OS ENCERRADAS --');
     d.os_encerradas.forEach(function(o) {
@@ -866,7 +882,7 @@ function copiarTudo() {
     });
   }
 
-  if (d.comodatos && d.comodatos.length) {
+  if (_secaoPermitida('comodatos') && d.comodatos && d.comodatos.length) {
     L.push('');
     L.push('-- COMODATOS --');
     d.comodatos.forEach(function(co) {
@@ -877,7 +893,7 @@ function copiarTudo() {
   // OLT Cloud
   var oltCloud = d._olt_cloud || {};
   var oltEntries = Object.values(oltCloud).filter(function(o) { return o && o.sinal_onu != null; });
-  if (oltEntries.length) {
+  if (_secaoPermitida('logins') && oltEntries.length) {
     L.push('');
     L.push('-- OLT CLOUD --');
     oltEntries.forEach(function(olt) {
