@@ -18,6 +18,7 @@
           usuario_id:    sessao.usuario_id,
           usuario_nome:  sessao.usuario_nome,
           usuario_login: sessao.usuario_login,
+          id_grupo:      sessao.id_grupo ?? null,
           token_proprio: sessao.token_proprio,
           acao:          acao,
           contrato_id:   dados.contrato_id || null,

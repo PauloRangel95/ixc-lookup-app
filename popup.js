@@ -328,13 +328,25 @@ const GESTAO_LOGS_URL = 'https://carajasnet-supabase.bwadmr.easypanel.host/rest/
 
 let gestaoAbaAtiva = 'uso';
 let gestaoPeriodoAtivo = '7';
-let gestaoAgregadoCache = null; // { ag, periodo } — p/ exportar PDF
+let gestaoCargoFiltro = 'todos';   // 'todos' | 'tecnico' | 'atendente'
+let gestaoAgregadoCache = null; // { ag, periodo } — ag é SEMPRE o agregado completo (sem filtro de cargo)
+
+// Grupo de usuário do IXC -> cargo (1 = técnico, 2 = atendente)
+function cargoDeGrupo(g) {
+  const n = Number(g);
+  if (n === 1) return 'tecnico';
+  if (n === 2) return 'atendente';
+  return 'outro';
+}
+function cargoLabel(c) { return c === 'tecnico' ? 'Técnico' : c === 'atendente' ? 'Atendente' : '—'; }
 
 (function initGestao(){
   const btnG = document.getElementById('btn-gestao');
   if (btnG) btnG.addEventListener('click', () => {
     document.getElementById('gestao-modal').style.display = 'flex';
     setGestaoAba('uso');
+    gestaoCargoFiltro = 'todos';
+    atualizarBotoesCargo();
     setGestaoPeriodo('7');
   });
   const fecharG = document.getElementById('gestao-fechar');
@@ -346,6 +358,9 @@ let gestaoAgregadoCache = null; // { ag, periodo } — p/ exportar PDF
   });
   document.querySelectorAll('.gestao-tab').forEach(b => {
     b.addEventListener('click', () => setGestaoAba(b.dataset.gtab));
+  });
+  document.querySelectorAll('.gestao-cargo').forEach(b => {
+    b.addEventListener('click', () => setGestaoCargo(b.dataset.cargo));
   });
   const btnPdf = document.getElementById('gestao-pdf');
   if (btnPdf) btnPdf.addEventListener('click', exportarRelatorioPDF);
@@ -368,6 +383,40 @@ function setGestaoPeriodo(p) {
     b.classList.toggle('btn-gray', !ativo);
   });
   carregarGestao(p);
+}
+
+function atualizarBotoesCargo() {
+  document.querySelectorAll('.gestao-cargo').forEach(b => {
+    const ativo = b.dataset.cargo === gestaoCargoFiltro;
+    b.classList.toggle('btn-blue', ativo);
+    b.classList.toggle('btn-gray', !ativo);
+  });
+}
+
+function setGestaoCargo(c) {
+  gestaoCargoFiltro = c || 'todos';
+  atualizarBotoesCargo();
+  // Re-renderiza a partir do cache (não precisa buscar de novo no servidor)
+  const el = document.getElementById('gestao-resultado');
+  if (el && gestaoAgregadoCache) el.innerHTML = renderGestao(filtrarAgregadoPorCargo(gestaoAgregadoCache.ag, gestaoCargoFiltro));
+}
+
+// Recalcula os conjuntos derivados (ativos/ociosos/total) sobre uma lista já filtrada
+function derivarConjuntosGestao(lista) {
+  const AGORA = Date.now();
+  const SESSAO_MS = 4*3600*1000;
+  const totalAcoes = lista.reduce((s,u)=>s+u.acoes,0);
+  const ativos  = lista.filter(u => (AGORA-u.ultimo) < SESSAO_MS && u.ultimaAcao!=='LOGOUT');
+  const ociosos = lista.filter(u => (u.byAcao['LOGIN']||0)>0 && u.acoes<=1);
+  return { AGORA, lista, totalAcoes, ativos, ociosos };
+}
+
+// Aplica o filtro de cargo ao agregado completo, devolvendo um novo agregado
+function filtrarAgregadoPorCargo(ag, cargo) {
+  if (!cargo || cargo === 'todos') return ag;
+  // 'atendente' inclui quem não é técnico (grupo desconhecido = atendente por padrão)
+  const lista = ag.lista.filter(u => cargo === 'tecnico' ? u.cargo === 'tecnico' : u.cargo !== 'tecnico');
+  return derivarConjuntosGestao(lista);
 }
 
 function gestaoPeriodoLabel(p) {
@@ -396,7 +445,7 @@ async function carregarGestao(periodo) {
     if (!Array.isArray(logs) || !logs.length) { gestaoAgregadoCache = null; el.innerHTML = '<div class="empty">Nenhuma atividade no período.</div>'; return; }
     const ag = agregarGestao(logs);
     gestaoAgregadoCache = { ag, periodo };
-    el.innerHTML = renderGestao(ag);
+    el.innerHTML = renderGestao(filtrarAgregadoPorCargo(ag, gestaoCargoFiltro));
   } catch(e) {
     el.innerHTML = `<div style="color:var(--r)">Erro ao carregar gestão: ${e.message}</div>`;
   }
@@ -409,7 +458,7 @@ function agregarGestao(logs) {
   const users = {};
   logs.forEach(l => {
     const key = l.usuario_login || l.usuario_nome || ('id'+l.usuario_id) || '—';
-    if (!users[key]) users[key] = { login:key, nome:l.usuario_nome||key, total:0, acoes:0, falhas:0, byAcao:{}, ultimo:null, ultimaAcao:null, versao:null };
+    if (!users[key]) users[key] = { login:key, nome:l.usuario_nome||key, total:0, acoes:0, falhas:0, byAcao:{}, ultimo:null, ultimaAcao:null, versao:null, id_grupo:null, cargo:'outro' };
     const u = users[key];
     u.byAcao[l.acao] = (u.byAcao[l.acao]||0)+1;
     u.total++;
@@ -418,6 +467,7 @@ function agregarGestao(logs) {
     const t = new Date(l.criado_em).getTime();
     if (u.ultimo===null || t>u.ultimo) { u.ultimo=t; u.ultimaAcao=l.acao; }
     if (!u.versao && l.extensao_versao) u.versao = l.extensao_versao; // logs DESC → 1º não-nulo = mais recente
+    if (u.id_grupo==null && l.id_grupo!=null) { u.id_grupo = l.id_grupo; u.cargo = cargoDeGrupo(l.id_grupo); }
   });
   const lista = Object.values(users);
   const totalAcoes = lista.reduce((s,u)=>s+u.acoes,0);
@@ -456,6 +506,7 @@ function renderGestao(ag) {
 
   const linhas = [...lista].sort((a,b)=>b.acoes-a.acoes).map(u=>`<tr style="border-bottom:1px solid var(--b)">
     <td style="padding:4px 6px">${u.nome}</td>
+    <td style="text-align:center">${cargoLabel(u.cargo)}</td>
     <td style="text-align:center">${u.versao?('v'+u.versao):'—'}</td>
     <td style="text-align:center">${consultas(u)}</td>
     <td style="text-align:center">${u.byAcao['DESBLOQUEIO_CONFIANCA']||0}</td>
@@ -466,7 +517,7 @@ function renderGestao(ag) {
   </tr>`).join('');
   html += secaoGestao('👤 Por colaborador', `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:10px;color:var(--tx)">
     <thead><tr style="color:var(--tx3);text-align:left">
-      <th style="padding:4px 6px">Colaborador</th><th style="text-align:center">Versão</th><th style="text-align:center" title="Consultas (contrato + CPF)">🔍</th><th style="text-align:center" title="Desbloqueios">🔓</th><th style="text-align:center" title="Boletos por e-mail">✉</th><th style="text-align:center" title="OS agendadas">🛠</th><th style="text-align:center" title="Falhas">⚠</th><th>Último acesso</th>
+      <th style="padding:4px 6px">Colaborador</th><th style="text-align:center">Cargo</th><th style="text-align:center">Versão</th><th style="text-align:center" title="Consultas (contrato + CPF)">🔍</th><th style="text-align:center" title="Desbloqueios">🔓</th><th style="text-align:center" title="Boletos por e-mail">✉</th><th style="text-align:center" title="OS agendadas">🛠</th><th style="text-align:center" title="Falhas">⚠</th><th>Último acesso</th>
     </tr></thead><tbody>${linhas}</tbody></table></div>`);
 
   return html;
@@ -503,7 +554,9 @@ function exportarRelatorioPDF() {
 
 function exportarUsoPDF() {
   if (!gestaoAgregadoCache) { toast('Nada para exportar — carregue a aba Uso primeiro.','err'); return; }
-  const { ag, periodo } = gestaoAgregadoCache;
+  const { periodo } = gestaoAgregadoCache;
+  // Respeita o filtro de cargo ativo (Todos / Técnicos / Atendentes)
+  const ag = filtrarAgregadoPorCargo(gestaoAgregadoCache.ag, gestaoCargoFiltro);
   const { lista, totalAcoes, ativos, ociosos, AGORA } = ag;
   const tempoRel = ms => { if(!ms) return '—'; const m=Math.floor((AGORA-ms)/60000); if(m<1)return 'agora'; if(m<60)return m+'min atrás'; const h=Math.floor(m/60); if(h<24)return h+'h atrás'; return Math.floor(h/24)+'d atrás'; };
   const consultas = u => (u.byAcao['CONSULTA_CONTRATO']||0)+(u.byAcao['CONSULTA_CPF']||0);
@@ -512,6 +565,7 @@ function exportarUsoPDF() {
 
   const linhasColab = ranking.map((u,i)=>`<tr>
     <td class="tcenter">${i+1}</td><td>${escPdf(u.nome)}</td>
+    <td class="tcenter">${cargoLabel(u.cargo)}</td>
     <td class="tcenter">${u.versao?('v'+escPdf(u.versao)):'—'}</td>
     <td class="tcenter">${u.acoes}</td>
     <td class="tcenter">${consultas(u)}</td>
@@ -535,7 +589,7 @@ function exportarUsoPDF() {
 
   const corpo = `
     <h1>Relatório de Uso — IXC Lookup</h1>
-    <div class="muted">Período: ${escPdf(gestaoPeriodoLabel(periodo))} · Gerado em ${new Date().toLocaleString('pt-BR')}</div>
+    <div class="muted">Período: ${escPdf(gestaoPeriodoLabel(periodo))} · Filtro: ${escPdf(gestaoCargoFiltro==='tecnico'?'Técnicos':gestaoCargoFiltro==='atendente'?'Atendentes':'Todos')} · Gerado em ${new Date().toLocaleString('pt-BR')}</div>
 
     <h2>Resumo</h2>
     <table><thead><tr><th>Colaboradores</th><th>Ações no período</th><th>Ativos agora</th><th>Ociosos</th></tr></thead>
@@ -551,7 +605,7 @@ function exportarUsoPDF() {
     <table><thead><tr><th>Colaborador</th><th>Logins</th><th>Ações</th></tr></thead><tbody>${linhasOciosos}</tbody></table>
 
     <h2>👤 Por colaborador</h2>
-    <table><thead><tr><th>#</th><th>Colaborador</th><th>Versão</th><th>Ações</th><th>Consultas</th><th>Desbloq.</th><th>Boletos</th><th>OS</th><th>Falhas</th><th>Último acesso</th></tr></thead>
+    <table><thead><tr><th>#</th><th>Colaborador</th><th>Cargo</th><th>Versão</th><th>Ações</th><th>Consultas</th><th>Desbloq.</th><th>Boletos</th><th>OS</th><th>Falhas</th><th>Último acesso</th></tr></thead>
     <tbody>${linhasColab}</tbody></table>`;
   abrirRelatorioPDF('Relatório de Uso — IXC Lookup', corpo);
 }
