@@ -653,6 +653,21 @@ document.addEventListener('click', e => {
   if (action==='enviar-boleto-email') enviarBoletoEmail(p, p2);
   if (action==='abrir-agendar')       abrirAgendarOS(p, p2);
   if (action==='potencia-onu')        consultarPotenciaONU(p, p2);
+  if (action==='toggle-pppoe-pass') {
+    const disp = btn.parentElement.querySelector('.pass-display');
+    if (disp) {
+      const showing = disp.getAttribute('data-showing') === '1';
+      if (showing) {
+        disp.textContent = '••••••••';
+        disp.removeAttribute('data-showing');
+        btn.textContent = '👁';
+      } else {
+        disp.textContent = disp.getAttribute('data-pass') || '';
+        disp.setAttribute('data-showing','1');
+        btn.textContent = '🙈';
+      }
+    }
+  }
 });
 
 // Mostrar/ocultar senha
@@ -1437,6 +1452,21 @@ function render(d) {
     }
 
     body += mrow('Conexão', l.conexao);
+
+    // v1.9.2 — Senha PPPoE (mascarada, com revelar/copiar)
+    const _senhaPPPoE = l.senha || l.password || '';
+    if (_senhaPPPoE) {
+      const _esc = String(_senhaPPPoE).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      body += `<div class="meta-row">
+        <span class="meta-key">Senha</span>
+        <span class="meta-val" style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+          <span class="pass-display" data-pass="${_esc}" style="font-family:var(--font-mono);letter-spacing:.5px">••••••••</span>
+          <button data-action="toggle-pppoe-pass" title="Mostrar/ocultar senha" style="background:transparent;border:none;color:var(--acc);cursor:pointer;font-size:13px;padding:0 2px;line-height:1">👁</button>
+          <button data-action="pix" data-p="${_esc}" title="Copiar senha" style="background:transparent;border:none;color:var(--acc);cursor:pointer;font-size:12px;padding:0 2px;line-height:1">📋</button>
+        </span>
+      </div>`;
+    }
+
     body += `<div id="copy-rede-${i}">`;
     body += secT('Rede');
     body += mrow('IP', l.ip);
