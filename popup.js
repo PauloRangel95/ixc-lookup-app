@@ -2004,10 +2004,16 @@ async function carregarHistSZ(el) {
           box.innerHTML = msgs.map(m => {
             const who = m.remetente || '—';
             const txt = (m.mensagem || '').replace(/<br\s*\/?>/gi, ' ');
-            const mid = m.tem_midia ? ` ${badge('📎 ' + (m.midia_tipo || 'mídia'), 'cinza')}` : '';
+            const indisp = (m.tem_midia && !m.midia_url) ? ` ${badge('📎 ' + (m.midia_tipo || 'mídia') + ' · indisponível', 'cinza')}` : '';
+            let anexo = '';
+            if (m.midia_url) {
+              anexo = (m.midia_tipo === 'images')
+                ? `<div style="margin-top:4px"><a href="${m.midia_url}" target="_blank" rel="noopener"><img src="${m.midia_url}" style="max-width:180px;max-height:180px;border-radius:6px"></a></div>`
+                : `<div style="margin-top:4px"><a href="${m.midia_url}" target="_blank" rel="noopener">📎 abrir ${m.midia_tipo || 'anexo'}</a></div>`;
+            }
             return `<div style="border-left:3px solid ${who==='cliente'?'#22c55e':who==='atendente'?'#00c4ff':'#888'};padding:2px 8px;margin:3px 0">
-              <div style="font-size:10px;color:var(--tx2)">${_histszFmt(m.data_hora)} · ${who}${mid}</div>
-              <div style="font-size:12px">${txt}</div>
+              <div style="font-size:10px;color:var(--tx2)">${_histszFmt(m.data_hora)} · ${who}${indisp}</div>
+              <div style="font-size:12px">${txt}${anexo}</div>
             </div>`;
           }).join('');
         } catch(e) { box.innerHTML = `❌ ${e.message}`; }
