@@ -7,6 +7,7 @@ const WEBHOOK_CPF      = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/i
 const IXC_URL          = 'https://ixc.carajasnet.com';
 const WEBHOOK_ACOES    = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-desbloqueio';
 const WEBHOOK_LEITURAS = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-leituras';
+const WEBHOOK_HISTSZ   = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-histsz'; // histórico SZ Chat (Supabase via n8n)
 
 // ── Toggle de token (v1.6) ──
 // Modo padrão na 1ª vez: master (mais seguro — não dá erro inesperado)
@@ -766,6 +767,7 @@ function trocarAba(tab) {
   // (mantém comportamento original que era ao clicar no card)
   if (tab === 'atendimento') triggerLazyByCardId('tickets');
   if (tab === 'historicos')  { triggerLazyByCardId('hist-contrato'); triggerLazyByCardId('negociacoes'); }
+  if (tab === 'sz')          triggerLazyByCardId('histsz');
   if (tab === 'servicos')    { triggerLazyByCardId('produtos-contrato'); triggerLazyByCardId('tv-sva'); }
 }
 
@@ -795,6 +797,7 @@ async function triggerLazyByCardId(cardId) {
     if (tipo === 'tickets')     await carregarTickets(lazy);
     if (tipo === 'historico')   await carregarHistoricoContrato(lazy);
     if (tipo === 'negociacoes') await carregarNegociacoes(lazy);
+    if (tipo === 'histsz')      await carregarHistSZ(lazy);
     if (tipo === 'produtos')    await carregarProdutos(lazy);
     if (tipo === 'tvsva')       await carregarTVSVA(lazy);
   } catch(e) {
@@ -1256,6 +1259,7 @@ const CARD_TAB = {
   'tickets':          'atendimento',
   'hist-contrato':    'historicos',
   'negociacoes':      'historicos',
+  'histsz':           'sz',
   'comodatos':        'servicos',
   'produtos-contrato':'servicos',
   'tv-sva':           'servicos'
@@ -1392,6 +1396,7 @@ function render(d) {
     <button class="tab-btn" data-tab-target="atendimento">🛠 Atendimento</button>
     <button class="tab-btn" data-tab-target="historicos">📜 Históricos</button>
     <button class="tab-btn" data-tab-target="servicos">📦 Serviços</button>
+    <button class="tab-btn" data-tab-target="sz">💬 SZ Chat</button>
   </div>`;
 
   let cHtml='';
@@ -1772,6 +1777,9 @@ function render(d) {
   elRes.innerHTML += card('negociacoes','Negociações CRM',[],
     `<div id="negoc-content"><div class="lazy-load" data-load="negociacoes">🤝 Clique para carregar negociações</div></div>`, false);
 
+  elRes.innerHTML += card('histsz','Histórico SZ Chat',[],
+    `<div id="histsz-content"><div class="lazy-load" data-load="histsz">💬 Clique para carregar conversas do SZ Chat</div></div>`, false);
+
   elRes.innerHTML += card('produtos-contrato','Produtos do Contrato',[],
     `<div id="prod-content"><div class="lazy-load" data-load="produtos">📦 Clique para carregar produtos</div></div>`, false);
 
@@ -1813,6 +1821,7 @@ document.addEventListener('click', async e => {
     if (tipo==='tickets')     await carregarTickets(lazy);
     if (tipo==='historico')   await carregarHistoricoContrato(lazy);
     if (tipo==='negociacoes') await carregarNegociacoes(lazy);
+    if (tipo==='histsz')      await carregarHistSZ(lazy);
     if (tipo==='produtos')    await carregarProdutos(lazy);
     if (tipo==='tvsva')       await carregarTVSVA(lazy);
   } catch(e) {
@@ -1869,6 +1878,153 @@ async function carregarTickets(el) {
     return item(`tkt-${i}`,`<span class="item-title">#${t.id} — ${assunto}</span>`,b,i===0,badge(sl,bc(sl)));
   }).join('');
   if (el.parentElement) el.parentElement.innerHTML=html;
+}
+
+// ── Histórico SZ Chat (conversas migradas do SZ Chat; Supabase via n8n) ──
+function _histszDigits(v){ return (v||'').replace(/\D/g,''); }
+function _histszValores(cl){
+  // Identificadores do cliente p/ localizar as conversas. O CPF é a âncora
+  // estável (não muda se o cliente trocar de número); os telefones cobrem o
+  // resto. Gera variações de telefone com/sem o DDI 55.
+  const out = new Set();
+  const cpf = _histszDigits(cl && (cl.cpf || cl.cpf_cnpj));
+  if (cpf.length === 11 || cpf.length === 14) out.add(cpf);
+  [cl && cl.whatsapp, cl && cl.celular, cl && cl.telefone].forEach(t => {
+    const d = _histszDigits(t);
+    if (d.length < 8) return;
+    out.add(d);
+    if (d.startsWith('55')) out.add(d.slice(2)); else out.add('55' + d);
+  });
+  return [...out];
+}
+function _histszFmt(s){ try { return new Date(s).toLocaleString('pt-BR'); } catch(_) { return s || ''; } }
+
+async function carregarHistSZ(el) {
+  const container = document.getElementById('histsz-content') || el?.parentElement;
+  if (!container) return;
+  const cl = dadosAtual?.cliente;
+  const contratoAberto = String(dadosAtual?.contrato?.id || dadosAtual?.contrato_id || '');
+  const valores = _histszValores(cl);
+  if (!valores.length) { container.innerHTML = '<div class="empty">Sem CPF/telefone do cliente para buscar</div>'; return; }
+  container.innerHTML = '<div class="empty">⏳ Buscando conversas do SZ Chat...</div>';
+
+  let convs = [];
+  try {
+    const r = await fetch(WEBHOOK_HISTSZ, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acao: 'conversas', valores, cliente_id: cl?.id, token: sessaoAtual?.token })
+    });
+    convs = await r.json();
+    if (!Array.isArray(convs)) convs = convs?.conversas || [];
+  } catch(e) { container.innerHTML = `❌ Erro ao buscar: ${e.message}`; return; }
+
+  if (!convs.length) { container.innerHTML = '<div class="empty">Nenhuma conversa do SZ Chat encontrada para este cliente</div>'; return; }
+
+  // markup de uma conversa (classe .histsz-conv p/ abrir mensagens)
+  const convCard = (c) => `<div class="histsz-conv" data-prot="${c.protocolo}" style="border:1px solid rgba(128,128,128,.25);border-radius:8px;padding:8px;margin-bottom:6px;cursor:pointer">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${badge(c.canal || '—', bc(c.canal))}${c.assunto ? ' ' + badge(c.assunto, 'azul') : ''}${(contratoAberto && Array.isArray(c.contratos) && c.contratos.map(String).includes(contratoAberto)) ? ' ' + badge('deste contrato', 'verde') : ''}
+        <b>#${c.protocolo}</b>
+        <span style="margin-left:auto;font-size:11px;color:var(--tx2)">${_histszFmt(c.inicio)}</span>
+      </div>
+      <div style="font-size:11px;color:var(--tx2);margin-top:4px">
+        ${c.qtd_mensagens || 0} msgs · cliente ${c.msgs_cliente || 0} · atend. ${c.msgs_atendente || 0}${c.qtd_midia ? ` · 📎 ${c.qtd_midia}` : ''}
+      </div>
+      <div class="histsz-msgs" id="histsz-msgs-${c.protocolo}" style="display:none;margin-top:8px"></div>
+    </div>`;
+
+  // cabeçalho colapsável genérico
+  const grpHtml = (titulo, count, inner, aberto, nivel) => {
+    const est = nivel === 0 ? 'font-weight:600;border-bottom:1px solid rgba(128,128,128,.2)' : 'color:var(--tx2)';
+    return `<div class="histsz-grp">
+      <div class="histsz-h" style="cursor:pointer;padding:${nivel===0?'4px':'3px'} 2px;${est}"><span class="histsz-chev">${aberto?'▾':'▸'}</span> ${titulo} <span style="color:var(--tx2);font-weight:400">(${count})</span></div>
+      <div class="histsz-body" style="display:${aberto?'block':'none'};margin-left:6px;margin-top:4px">${inner}</div>
+    </div>`;
+  };
+
+  let modo = 'data'; // 'data' | 'assunto'
+
+  const renderData = () => {
+    const g = {};
+    convs.forEach(c => { const d=new Date(c.inicio); const ano=isNaN(d.getTime())?'—':String(d.getFullYear()); const mk=isNaN(d.getTime())?'—':`${ano}-${String(d.getMonth()+1).padStart(2,'0')}`; (g[ano]=g[ano]||{}); (g[ano][mk]=g[ano][mk]||[]).push(c); });
+    const nomeMes=(mk)=>{ if(mk==='—')return 'Sem data'; const [y,m]=mk.split('-'); return new Date(Number(y),Number(m)-1,1).toLocaleString('pt-BR',{month:'long'}).replace(/^./,s=>s.toUpperCase())+' '+y; };
+    const anos=Object.keys(g).sort((a,b)=>b.localeCompare(a));
+    let h='';
+    anos.forEach((ano,ai)=>{
+      const meses=Object.keys(g[ano]).sort((a,b)=>b.localeCompare(a));
+      const totAno=meses.reduce((s,mk)=>s+g[ano][mk].length,0);
+      let inner='';
+      meses.forEach((mk,mi)=>{ inner += grpHtml(nomeMes(mk), g[ano][mk].length, g[ano][mk].map(convCard).join(''), ai===0&&mi===0, 1); });
+      h += grpHtml(ano, totAno, inner, ai===0, 0);
+    });
+    return h;
+  };
+
+  const renderAssunto = () => {
+    const g = {};
+    convs.forEach(c => { const a=c.assunto||'Outros'; (g[a]=g[a]||[]).push(c); });
+    const chaves=Object.keys(g).sort((a,b)=>{ if(a==='Outros')return 1; if(b==='Outros')return -1; return g[b].length-g[a].length; });
+    let h='';
+    chaves.forEach((a,ai)=>{
+      const lista=g[a].slice().sort((x,y)=>String(y.inicio).localeCompare(String(x.inicio)));
+      h += grpHtml(a, lista.length, lista.map(convCard).join(''), ai===0, 0);
+    });
+    return h;
+  };
+
+  const attachListeners = () => {
+    container.querySelectorAll('.histsz-h').forEach(h => {
+      h.addEventListener('click', () => {
+        const body = h.nextElementSibling; if (!body) return;
+        const chev = h.querySelector('.histsz-chev');
+        const open = body.style.display !== 'none';
+        body.style.display = open ? 'none' : 'block';
+        if (chev) chev.textContent = open ? '▸' : '▾';
+      });
+    });
+    container.querySelectorAll('.histsz-conv').forEach(div => {
+      div.addEventListener('click', async (ev) => {
+        if (ev.target.closest('.histsz-msgs')) return;
+        const prot = div.getAttribute('data-prot');
+        const box = document.getElementById('histsz-msgs-' + prot);
+        if (!box) return;
+        if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+        box.style.display = 'block';
+        if (box.dataset.loaded === 'true') return;
+        box.innerHTML = '<div class="empty">⏳ Carregando mensagens...</div>';
+        try {
+          const r = await fetch(WEBHOOK_HISTSZ, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ acao: 'mensagens', protocolo: prot, token: sessaoAtual?.token })
+          });
+          let msgs = await r.json();
+          if (!Array.isArray(msgs)) msgs = msgs?.mensagens || [];
+          box.dataset.loaded = 'true';
+          if (!msgs.length) { box.innerHTML = '<div class="empty">Sem mensagens</div>'; return; }
+          box.innerHTML = msgs.map(m => {
+            const who = m.remetente || '—';
+            const txt = (m.mensagem || '').replace(/<br\s*\/?>/gi, ' ');
+            const mid = m.tem_midia ? ` ${badge('📎 ' + (m.midia_tipo || 'mídia'), 'cinza')}` : '';
+            return `<div style="border-left:3px solid ${who==='cliente'?'#22c55e':who==='atendente'?'#00c4ff':'#888'};padding:2px 8px;margin:3px 0">
+              <div style="font-size:10px;color:var(--tx2)">${_histszFmt(m.data_hora)} · ${who}${mid}</div>
+              <div style="font-size:12px">${txt}</div>
+            </div>`;
+          }).join('');
+        } catch(e) { box.innerHTML = `❌ ${e.message}`; }
+      });
+    });
+  };
+
+  const render = () => {
+    const btn = (id, txt) => `<button class="histsz-modo" data-modo="${id}" style="flex:1;padding:5px 6px;border:1px solid rgba(128,128,128,.3);border-radius:6px;cursor:pointer;font-size:11px;background:${modo===id?'#00c4ff':'transparent'};color:${modo===id?'#00141f':'inherit'};font-weight:${modo===id?'600':'400'}">${txt}</button>`;
+    const head = `<div style="display:flex;gap:6px;margin-bottom:8px">${btn('data','📅 Ano/Mês')}${btn('assunto','🏷️ Assunto')}</div>
+      <div style="font-size:11px;color:var(--tx2);margin-bottom:6px">Histórico do cliente · todos os contratos · ${convs.length} conversa(s)</div>`;
+    container.innerHTML = head + (modo === 'data' ? renderData() : renderAssunto());
+    container.querySelectorAll('.histsz-modo').forEach(b => b.addEventListener('click', () => { modo = b.getAttribute('data-modo'); render(); }));
+    attachListeners();
+  };
+
+  render();
 }
 
 async function carregarHistoricoContrato(el) {

@@ -27,6 +27,7 @@
     financeiro: ['fin', 'fin-ajustes'], financas: ['fin', 'fin-ajustes'],
     atendimento: ['os-ab', 'os-en', 'tickets'], os: ['os-ab', 'os-en'], tickets: ['tickets'],
     historicos: ['hist-contrato', 'negociacoes'], negociacoes: ['negociacoes'],
+    sz: ['histsz'],
     servicos: ['comodatos', 'produtos-contrato', 'tv-sva'],
     comodatos: ['comodatos'], produtos: ['produtos-contrato'], tvsva: ['tv-sva']
   };
@@ -35,13 +36,13 @@
     'contrato': 'geral', 'cliente': 'geral', 'logins': 'conexao',
     'fin': 'financas', 'fin-ajustes': 'financas',
     'os-ab': 'atendimento', 'os-en': 'atendimento', 'tickets': 'atendimento',
-    'hist-contrato': 'historicos', 'negociacoes': 'historicos',
+    'hist-contrato': 'historicos', 'negociacoes': 'historicos', 'histsz': 'sz',
     'comodatos': 'servicos', 'produtos-contrato': 'servicos', 'tv-sva': 'servicos'
   };
   // Mapa de chave de ação -> data-action real (aliases amigáveis)
   const ACAO_ALIAS = { 'agendar': 'abrir-agendar', 'enviar-email': 'enviar-boleto-email' };
   const ACOES = ['copiar-tudo', 'desbloquear', 'desconectar', 'reboot-onu', 'abrir-agendar', 'enviar-boleto-email', 'boleto', 'roteador', 'potencia-onu'];
-  const ORDEM_ABAS = ['geral', 'conexao', 'financas', 'atendimento', 'historicos', 'servicos'];
+  const ORDEM_ABAS = ['geral', 'conexao', 'financas', 'atendimento', 'historicos', 'servicos', 'sz'];
 
   let permitido = null;      // null = tudo liberado
   let loadedFor = undefined; // e-mail para o qual já carregamos
