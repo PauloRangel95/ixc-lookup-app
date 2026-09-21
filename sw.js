@@ -1,7 +1,7 @@
 /* IXC Lookup PWA — service worker.
  * Cacheia o "app shell" (UI) para instalar/abrir offline; nunca cacheia chamadas de API.
  */
-const CACHE = 'ixc-lookup-pwa-v11';
+const CACHE = 'ixc-lookup-pwa-v12';
 const SHELL = [
   './', './index.html', './chrome-shim.js', './auth.js', './logger.js', './popup.js', './permissoes.js',
   './relatorio.html', './relatorio.js', './manifest.webmanifest',
@@ -25,15 +25,12 @@ self.addEventListener('fetch', (e) => {
       /easypanel\.host|supabase|oltcloud|ixc\.carajasnet/.test(url)) {
     return;
   }
-  // App shell: cache-first com atualização em segundo plano
+  // App shell: NETWORK-FIRST (online sempre pega a versao nova; cache = fallback offline)
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      const net = fetch(e.request).then(resp => {
-        const cp = resp.clone();
-        caches.open(CACHE).then(c => c.put(e.request, cp)).catch(() => {});
-        return resp;
-      }).catch(() => cached || caches.match('./index.html'));
-      return cached || net;
-    })
+    fetch(e.request).then(resp => {
+      const cp = resp.clone();
+      caches.open(CACHE).then(c => c.put(e.request, cp)).catch(() => {});
+      return resp;
+    }).catch(() => caches.match(e.request).then(c => c || caches.match('./index.html')))
   );
 });
