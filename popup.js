@@ -2332,6 +2332,44 @@ async function buscarOLT(logins) {
         const d=resDetail.status==='fulfilled'?resDetail.value?.equipment:null;
         if (!d) { erros.push(`${l.login}: sem detalhes`); continue; }
 
+        // ── Caixa (CTO): validar IXC × OLT Cloud ──────────────────────────
+        // No OLT Cloud a caixa é um "Box"; a associação ONU↔Box é MANUAL, então
+        // pode divergir do IXC. Achamos o Box cujo occupation tem este pppoe.
+        let caixaOlt = null;
+        try {
+          const pppoeL = (l.login || '').toLowerCase();
+          const matchBox = (boxes) => {
+            for (const b of (boxes || [])) {
+              for (const o of (b.occupation || [])) {
+                if ((o.pppoe || '').toLowerCase() === pppoeL) return { b, o };
+              }
+            }
+            return null;
+          };
+          const getJson = async (url) => { try { const r = await fetch(url, { headers: hdrs }); return r.ok ? await r.json() : null; } catch (_) { return null; } };
+          let hit = null;
+          if (d.pon_id) { // caminho rápido: só as caixas do mesmo PON
+            const j = await getJson(`${OLT_BASE}/box/list?pon_id=${encodeURIComponent(d.pon_id)}&page_size=1000`);
+            hit = matchBox(j?.results);
+          }
+          if (!hit) { // fallback: varre o inventário (limitado a 15 páginas)
+            let url = `${OLT_BASE}/box/list?page_size=1000`, pages = 0;
+            while (url && pages < 15) {
+              const j = await getJson(url); pages++;
+              hit = matchBox(j?.results); if (hit) break;
+              url = j?.next || null;
+            }
+          }
+          if (hit) caixaOlt = { id: hit.b.id, name: hit.b.name, porta: hit.o.port };
+        } catch (e) {}
+
+        // extrai o código da caixa e normaliza (CT/CTO/CX, espaços, zeros à esquerda) -> "CT<num>"
+        const codCaixa = (txt) => { const m = String(txt || '').toUpperCase().match(/C[TX]O?\s*0*(\d+)/); return m ? ('CT' + m[1]) : null; };
+        const ixcCod = codCaixa(l.caixa_ftth);
+        const oltCod = caixaOlt ? codCaixa(caixaOlt.name) : null;
+        const caixaValidada = !!(ixcCod && oltCod);
+        const caixaConflito = caixaValidada && ixcCod !== oltCod;
+
         // PON realtime com dados do equipment
         let realtimeData=null;
         if (d.olt_id&&d.slot&&d.pon) {
@@ -2372,7 +2410,10 @@ async function buscarOLT(logins) {
           intermitencia:d.optical_module_intermittency||false,
           onu_desabilitada:disableData?.disable===true,
           alertas, historico_status, sem_energia,
-          pon_total, pon_online, pon_offline, problema_coletivo
+          pon_total, pon_online, pon_offline, problema_coletivo,
+          caixa_ixc_raw:l.caixa_ftth||null, caixa_ixc_cod:ixcCod,
+          caixa_olt:caixaOlt, caixa_olt_cod:oltCod,
+          caixa_validada:caixaValidada, caixa_conflito:caixaConflito
         };
       } catch(e) { erros.push(`${l.login}: ${e.message}`); }
     }
@@ -2417,7 +2458,24 @@ async function buscarOLT(logins) {
         rebootSlot.innerHTML = `<button class="btn-sm btn-yellow" data-action="reboot-onu" data-p="${olt.eq_id||''}" data-p2="${l.login}" data-p3="${dadosAtual?.contrato_id||''}">🔄 Reboot ONU</button>`;
       }
 
-      let oltHtml=secTCopy('OLT Cloud — Sinal em tempo real','olt-sinal-'+sid)+`<div id="olt-sinal-${sid}">`;
+      let oltHtml='';
+      // ── Validação de caixa (CTO): IXC × OLT Cloud ──
+      const escCx=(t)=>String(t==null?'':t).replace(/[<>]/g,'');
+      if (olt.caixa_conflito) {
+        oltHtml+=`<div class="olt-alarme vermelho" style="border:2px solid #e05252;border-radius:8px;padding:14px 16px;margin-bottom:8px">
+          <div style="font-size:17px;font-weight:800;letter-spacing:.3px">⚠️ CONFLITO DE CAIXA</div>
+          <div style="margin-top:8px;font-weight:800;font-size:20px">IXC: ${escCx(olt.caixa_ixc_cod)} &nbsp;×&nbsp; OLT Cloud: ${escCx(olt.caixa_olt_cod)}</div>
+          <div style="margin-top:8px;font-weight:600;opacity:.95;font-size:13px;line-height:1.5">
+            IXC: ${escCx(olt.caixa_ixc_raw)}<br>OLT: ${escCx(olt.caixa_olt&&olt.caixa_olt.name)}${olt.caixa_olt&&olt.caixa_olt.porta?` (porta ${escCx(olt.caixa_olt.porta)})`:''}
+          </div>
+          <div style="margin-top:8px;font-weight:700;font-size:13px">As duas bases devem apontar a mesma caixa. Verifique e corrija.</div>
+        </div>`;
+      } else if (olt.caixa_validada) {
+        oltHtml+=`<div class="olt-alarme verde" style="font-size:14px;font-weight:700;padding:8px 12px">✓ Caixa confere nas duas bases (${escCx(olt.caixa_ixc_cod)})</div>`;
+      } else if (olt.caixa_ixc_cod || olt.caixa_olt) {
+        oltHtml+=`<div class="olt-alarme amarelo" style="font-size:13px;font-weight:600;padding:8px 12px">🔎 Caixa não validada${olt.caixa_olt?'':' (não localizada no inventário do OLT Cloud)'}${olt.caixa_ixc_cod?' — IXC: '+escCx(olt.caixa_ixc_cod):''}</div>`;
+      }
+      oltHtml+=secTCopy('OLT Cloud — Sinal em tempo real','olt-sinal-'+sid)+`<div id="olt-sinal-${sid}">`;
       oltHtml+=`<div class="olt-grid">
         <div class="olt-item ${sinalCls(olt.sinal_onu)}"><div class="olt-label">RX ONU</div><div class="olt-val">${fmtOLT(olt.sinal_onu,2,' dBm')}</div></div>
         <div class="olt-item ${sinalCls(olt.sinal_olt)}"><div class="olt-label">RX OLT</div><div class="olt-val">${fmtOLT(olt.sinal_olt,2,' dBm')}</div></div>
