@@ -1272,7 +1272,24 @@ body::before{
 <script src="permissoes.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+  // Auto-atualização transparente: recarrega 1x quando um SW novo assume o controle,
+  // sem precisar "limpar dados". Não recarrega no primeiro install.
+  var __tinhaController = !!navigator.serviceWorker.controller;
+  var __jaRecarregou = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if (__jaRecarregou || !__tinhaController) return; // 1º install não recarrega
+    __jaRecarregou = true;
+    window.location.reload();
+  });
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      try { reg.update(); } catch(e){}                       // checa ao abrir
+      document.addEventListener('visibilitychange', function(){ // e ao voltar o foco
+        if (document.visibilityState === 'visible') { try { reg.update(); } catch(e){} }
+      });
+      setInterval(function(){ try { reg.update(); } catch(e){} }, 30*60*1000); // e a cada 30 min
+    }).catch(function(){});
+  });
 }
 </script>
 </body>
