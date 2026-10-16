@@ -8,7 +8,7 @@
       rel.innerHTML = '<p>Nenhum relatório para exibir. Gere novamente pela extensão.</p>';
       return;
     }
-    document.title = r.titulo || 'Relatório — IXC Lookup';
+    document.title = r.titulo || 'Relatório — CKS Lookup';
     rel.innerHTML = r.corpoHtml;
     // limpa para não reabrir conteúdo antigo numa próxima navegação manual
     try { chrome.storage.local.remove('ixc_relatorio'); } catch (e) {}

@@ -1,6 +1,6 @@
 {
-  "name": "IXC Lookup",
-  "short_name": "IXC Lookup",
+  "name": "CKS Lookup",
+  "short_name": "CKS Lookup",
   "description": "Consulta rápida de contratos IXC — cliente, logins, financeiro, OS e gestão.",
   "lang": "pt-BR",
   "start_url": "./index.html",

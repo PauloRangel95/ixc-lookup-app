@@ -589,7 +589,7 @@ function exportarUsoPDF() {
     : `<tr><td colspan="3">Nenhum colaborador ocioso.</td></tr>`;
 
   const corpo = `
-    <h1>Relatório de Uso — IXC Lookup</h1>
+    <h1>Relatório de Uso — CKS Lookup</h1>
     <div class="muted">Período: ${escPdf(gestaoPeriodoLabel(periodo))} · Filtro: ${escPdf(gestaoCargoFiltro==='tecnico'?'Técnicos':gestaoCargoFiltro==='atendente'?'Atendentes':'Todos')} · Gerado em ${new Date().toLocaleString('pt-BR')}</div>
 
     <h2>Resumo</h2>
@@ -608,7 +608,7 @@ function exportarUsoPDF() {
     <h2>👤 Por colaborador</h2>
     <table><thead><tr><th>#</th><th>Colaborador</th><th>Cargo</th><th>Versão</th><th>Ações</th><th>Consultas</th><th>Desbloq.</th><th>Boletos</th><th>OS</th><th>Falhas</th><th>Último acesso</th></tr></thead>
     <tbody>${linhasColab}</tbody></table>`;
-  abrirRelatorioPDF('Relatório de Uso — IXC Lookup', corpo);
+  abrirRelatorioPDF('Relatório de Uso — CKS Lookup', corpo);
 }
 
 function exportarLogsPDF() {
@@ -625,11 +625,11 @@ function exportarLogsPDF() {
     </tr>`;
   }).join('');
   const corpo = `
-    <h1>Relatório de Logs — IXC Lookup</h1>
+    <h1>Relatório de Logs — CKS Lookup</h1>
     <div class="muted">Filtro: ${escPdf(logsFiltroCache||'sem filtro')} · ${logsCache.length} registro(s) · Gerado em ${new Date().toLocaleString('pt-BR')}</div>
     <table><thead><tr><th>Data/Hora</th><th>Colaborador</th><th>Ação</th><th>Cliente / Contrato</th><th>Status</th><th>Detalhes</th></tr></thead>
     <tbody>${linhas}</tbody></table>`;
-  abrirRelatorioPDF('Relatório de Logs — IXC Lookup', corpo);
+  abrirRelatorioPDF('Relatório de Logs — CKS Lookup', corpo);
 }
 
 // ── Sinal OLT (somente informativo — faixas padrão fixas para todos) ──
@@ -3068,7 +3068,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     const mf = chrome.runtime.getManifest();
     const logo = document.getElementById('logo-ixc');
     if (logo && mf?.version) {
-      logo.title = `IXC Lookup v${mf.version}`;
+      logo.title = `CKS Lookup v${mf.version}`;
     }
   } catch(e) { /* ignora — manifest sempre acessível */ }
 })();
