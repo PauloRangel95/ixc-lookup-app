@@ -2366,14 +2366,9 @@ async function buscarOLT(logins) {
             const j = await getJson(`${OLT_BASE}/box/list?pon_id=${encodeURIComponent(d.pon_id)}&page_size=1000`);
             hit = matchBox(j?.results);
           }
-          if (!hit) { // fallback: varre o inventário (limitado a 15 páginas)
-            let url = `${OLT_BASE}/box/list?page_size=1000`, pages = 0;
-            while (url && pages < 15) {
-              const j = await getJson(url); pages++;
-              hit = matchBox(j?.results); if (hit) break;
-              url = j?.next || null;
-            }
-          }
+          // (removido) fallback que varria até 15 páginas de 1.000 caixas no OLT Cloud —
+          // causava dezenas de chamadas lentas (6-9s). A CTO autoritativa vem do OZmap;
+          // aqui mantemos só o caminho rápido por PON (1 chamada).
           if (hit) caixaOlt = { id: hit.b.id, name: hit.b.name, porta: hit.o.port };
         } catch (e) {}
 
