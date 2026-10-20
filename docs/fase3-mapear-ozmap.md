@@ -20,11 +20,13 @@
 5. **Conferir dados** (código=9441, nome, coords, endereço — vindos do IXC).
 6. **Confirmar** → cria no OZmap.
 
-## Desenho do drop (decisão)
-O `drop_poles` é uma **sequência ordenada de postes/pontos** (ids de BasePoint no OZmap). Duas formas:
-- **(a) Ligar postes existentes** (recomendado): mapa mostra CTO, cliente e os postes já cadastrados; o técnico toca na ordem (CTO → postes → cliente). Não cria elementos novos.
-- **(b) Desenho livre**: o técnico desenha vértices; criamos `points` novos no OZmap para cada um e usamos no `drop_poles`. Mais flexível, mais escrita/risco.
-- **Mapa no PWA:** biblioteca leve (ex.: Leaflet) com os postes/CTO/cliente plotados a partir das coords do OZmap.
+## Desenho do drop (decisão) — HÍBRIDO escolhido
+O `drop_poles` é uma **sequência ordenada de postes** (ids de BasePoint no OZmap). Abordagem:
+- **Mapa comum** (Leaflet + tiles de rua/satélite) com **CTO** e **cliente** marcados, e os **postes existentes** do OZmap plotados por perto (referência).
+- O técnico **desenha livre** o caminho do cabo (toca os pontos na ordem CTO → cliente).
+- **Ao salvar:** cada vértice desenhado é feito **snap no poste existente mais próximo** (dentro de uma tolerância, ex.: 25 m) → `drop_poles` = lista ordenada e sem repetição desses postes. **Liga pelos postes**, sem criar elementos.
+- **Sem poste por perto:** o vértice é ignorado **ou** (opcional, com aviso) cria-se um `point` novo ali.
+- Tolerância do snap e o "criar ponto quando não há poste" ficam configuráveis.
 
 ## Chamada de criação (OZmap)
 `POST /api/v2/properties` (SDK `property.create`):
