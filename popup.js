@@ -1556,11 +1556,11 @@ function render(d) {
     body += mrow('Franquia', l.franquia_consumo);
     body += '</div>';
 
+    // OZmap placeholder (rede física) — entre os dados do IXC e o OLT — preenchido por buscarOZmap()
+    body+=`<div class="ozmap-section" id="ozmap-${i}" style="margin-top:6px"><div class="sec-title">Rede (OZmap)</div><div class="olt-status-msg cinza">⏳ Carregando rede...</div></div>`;
+
     // OLT Cloud placeholder
     body+=`<div class="olt-section"><div class="sec-title">OLT Cloud — Sinal em tempo real</div><div class="olt-status-msg cinza">⏳ Carregando dados da OLT...</div></div>`;
-
-    // OZmap placeholder (rede física) — preenchido por buscarOZmap()
-    body+=`<div class="ozmap-section" id="ozmap-${i}" style="margin-top:6px"><div class="sec-title">Rede (OZmap)</div><div class="olt-status-msg cinza">⏳ Carregando rede...</div></div>`;
 
     body+=`<div class="btns">
       ${l.link_roteador?`<button class="btn-sm btn-blue" data-action="roteador" data-p="${l.ip}" data-p2="${l.porta_http}">🌐 Roteador</button>`:''}
