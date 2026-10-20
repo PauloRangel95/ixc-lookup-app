@@ -923,9 +923,18 @@ function copiarTudo() {
     L.push('-- LOGINS PPPoE --');
     d.logins.forEach(function(l) {
       L.push('Login: ' + l.login);
+      if (l.senha||l.password) L.push('  Senha: ' + (l.senha||l.password));
       L.push('  Status: ' + (l.status_acesso||l.online||'---'));
       L.push('  IP: ' + (l.ip||'---'));
       if (l.mac) L.push('  MAC: ' + l.mac);
+      if (l.onu_mac) L.push('  ONU MAC: ' + l.onu_mac);
+      if (l.conexao) L.push('  Conexao: ' + l.conexao);
+      var oz = (d._ozmap||{})[String(l.id)];
+      if (oz && oz.encontrado) {
+        if (oz.caixa && oz.caixa.nome) L.push('  CTO (OZmap): ' + oz.caixa.nome + (oz.caixa.tipo?(' ['+oz.caixa.tipo+']'):''));
+        if (oz.porta!=null)  L.push('  Porta: ' + oz.porta);
+        if (oz.drop_m!=null) L.push('  Drop: ' + oz.drop_m + ' m');
+      }
     });
   }
 
@@ -2313,6 +2322,7 @@ async function buscarOZmap(logins) {
       if (!d || d.ok === false) { if (sec) sec.innerHTML = secTOZ() + '<div class="olt-status-msg amarelo">⚠ OZmap indisponível</div>'; return; }
       if (!d.encontrado) { if (sec) sec.innerHTML = secTOZ() + '<div class="olt-status-msg cinza">Login não mapeado no OZmap</div>'; return; }
       resultados[i] = d;
+      if (dadosAtual) { dadosAtual._ozmap = dadosAtual._ozmap || {}; dadosAtual._ozmap[String(l.id)] = d; }
       if (sec) sec.innerHTML = renderOZmapHTML(d);
     } catch(e) {
       if (sec) sec.innerHTML = secTOZ() + '<div class="olt-status-msg amarelo">⚠ Erro ao consultar OZmap</div>';
