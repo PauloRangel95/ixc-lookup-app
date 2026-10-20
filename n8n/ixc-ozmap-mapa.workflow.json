@@ -1,0 +1,79 @@
+{
+  "name": "ixc-ozmap-mapa",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ixc-ozmap-mapa",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "375f685b-8b59-426e-aa11-39d72002d4dc",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        0
+      ],
+      "webhookId": "f1d87218-3b0e-4d18-887f-fdd53fa4dfad"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ixc-ozmap-mapa — leitura (GET-only): CTOs e postes próximos de um ponto.\n// Alimenta a tela de mapa onde o técnico desenha o drop (Fase 3).\n// Entrada (webhook): { lat, lng, radius? }   (radius em metros, default 400)\nconst OZ_BASE   = 'https://carajasnet.ozmap.com.br:9994'; // ORIGEM (com porta, SEM /api/v2)\nconst OZ_CLIENT = 'COLE_O_clientId_DO_CKS';\nconst OZ_SECRET = 'COLE_O_clientSecret_DO_CKS';\n\nconst BASE = String(OZ_BASE).replace(/\\/+$/,'').replace(/\\/api\\/v2$/i,'');\n\nconst body = $input.first().json.body || $input.first().json;\nconst lat = Number(body.lat), lng = Number(body.lng);\nconst radius = Number(body.radius) > 0 ? Number(body.radius) : 400;\nif (!isFinite(lat) || !isFinite(lng)) return [{ json:{ ok:false, erro:'lat e lng são obrigatórios' } }];\n\nfunction errInfo(e) {\n  const code = e.httpCode || e.statusCode || (e.response && e.response.statusCode) || '';\n  let detail = '';\n  try { const b = e.response && e.response.body; if (b) detail = typeof b === 'string' ? b : JSON.stringify(b); } catch(_) {}\n  if (!detail && e.description) detail = (typeof e.description === 'string') ? e.description : JSON.stringify(e.description);\n  return (code ? 'HTTP ' + code + ' ' : '') + (e.message || '') + (detail ? ' :: ' + String(detail).slice(0,300) : '');\n}\n\nlet AUTHPFX = '';\nasync function ozToken() {\n  try {\n    const r = await this.helpers.httpRequest({\n      method:'POST', url:`${BASE}/api/v2/auth/token`,\n      headers:{ 'Content-Type':'application/json' },\n      body:{ clientId:OZ_CLIENT, clientSecret:OZ_SECRET }, json:true\n    });\n    if (!r || !r.accessToken) throw new Error('resposta sem accessToken');\n    return r.accessToken;\n  } catch(e) { throw new Error('[auth] ' + errInfo(e)); }\n}\nasync function ozGet(token, pathq, bodyObj) {\n  const self = this;\n  const doReq = (pfx) => self.helpers.httpRequest({\n    method:'GET', url:`${BASE}/api/v2/${pathq}`,\n    headers:{ 'Authorization': pfx + token, 'Content-Type':'application/json' },\n    body: bodyObj || undefined, json:true\n  });\n  try { return await doReq(AUTHPFX); }\n  catch(e) {\n    const code = e.httpCode || e.statusCode || (e.response && e.response.statusCode);\n    if (code === 401 && AUTHPFX === '') { AUTHPFX = 'Bearer '; return await doReq(AUTHPFX); }\n    throw e;\n  }\n}\nasync function ozList(token, rota, filtro, limit) {\n  try {\n    let q = `page=1&limit=${limit}`;\n    if (filtro) q += '&filter=' + encodeURIComponent(JSON.stringify(filtro));\n    const r = await ozGet.call(this, token, `${rota}?${q}`, filtro ? { filter: filtro } : undefined);\n    return (r && Array.isArray(r.rows)) ? r.rows : [];\n  } catch(e) { throw new Error('['+rota+'] ' + errInfo(e)); }\n}\nasync function ozById(token, rota, id) {\n  if (!id) return null;\n  try { return await ozGet.call(this, token, `${rota}/${id}`); } catch(e) { return null; }\n}\n\ntry {\n  const token = await ozToken.call(this);\n  const near = [{ property:'coords', operator:'near', value:{ lat, lng, radius } }];\n  const [boxes, points] = await Promise.all([\n    ozList.call(this, token, 'boxes',  near, 60),\n    ozList.call(this, token, 'points', near, 300),\n  ]);\n\n  // Resolve o código do tipo de caixa (CTO/CD/CE) — poucos ids únicos\n  const tipoIds = [...new Set(boxes.map(b => b.boxType).filter(Boolean))];\n  const tipos = {};\n  await Promise.all(tipoIds.map(async id => { const t = await ozById.call(this, token, 'box-types', id); if (t) tipos[id] = t.code || t.name || null; }));\n\n  const coord = o => o ? (o.coords || (o.lng!=null && o.lat!=null ? [o.lng,o.lat] : null)) : null;\n\n  return [{ json: {\n    ok:true, center:[lng,lat], radius, auth_modo: AUTHPFX ? 'bearer' : 'cru',\n    caixas: boxes.map(b => ({\n      id: b.id||b._id, nome: b.name||null, tipo: tipos[b.boxType]||null,\n      implantada: b.implanted===true, coords: coord(b)\n    })).filter(c => c.coords),\n    postes: points.map(p => ({ id: p.id||p._id, coords: coord(p) })).filter(p => p.coords),\n    _counts: { caixas: boxes.length, postes: points.length }\n  } }];\n} catch(e) {\n  return [{ json: { ok:false, erro: 'OZmap: ' + (e.message||String(e)) } }];\n}\n"
+      },
+      "id": "af756937-8e13-446b-b008-7e0f46acb077",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "id": "527d6c93-5116-4772-8fa8-278139d89f50",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}
