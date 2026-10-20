@@ -901,22 +901,42 @@ function copiarTudo() {
   const d = dadosAtual;
   const root = document.getElementById('results');
   if (!d || !root) return;
+  const clean = function(s){ return (s||'').replace(/\s+/g,' ').trim(); };
   const L = [];
   L.push('==============================');
   if (d.cliente && d.cliente.nome) L.push('Cliente: ' + d.cliente.nome);
   if (d.contrato && (d.contrato.numero || d.contrato.id)) L.push('Contrato: #' + (d.contrato.numero || d.contrato.id));
   L.push('==============================');
 
-  root.querySelectorAll('.card').forEach(function(card) {
-    if (card.classList.contains('ixc-perm-hidden')) return;          // escondido pela permissão
-    const labelEl = card.querySelector('.card-label');
-    const body = card.querySelector('.card-body');
-    if (!labelEl || !body) return;
-    const linhas = _copiaLinhasDoCard(body);
-    if (!linhas.length) return;                                       // card vazio/não carregado
+  // Agrupa como no PWA: Aba → Card → Seção → Item. Rótulo da aba vem da própria barra de abas.
+  const ORDEM = ['geral','conexao','financas','atendimento','historicos','servicos'];
+  const rotuloAba = function(t){
+    const b = document.querySelector('.tab-btn[data-tab-target="'+t+'"]');
+    return b ? clean(b.innerText) : t;
+  };
+  const cards = Array.prototype.slice.call(root.querySelectorAll('.card'))
+    .filter(function(c){ return !c.classList.contains('ixc-perm-hidden'); });   // respeita permissão
+  const porAba = {};
+  cards.forEach(function(c){ const t = c.getAttribute('data-tab') || 'outros'; (porAba[t] = porAba[t] || []).push(c); });
+  const abas = ORDEM.filter(function(t){ return porAba[t]; })
+    .concat(Object.keys(porAba).filter(function(t){ return ORDEM.indexOf(t) < 0; }));
+
+  abas.forEach(function(t){
+    const blocos = [];
+    porAba[t].forEach(function(card){
+      const labelEl = card.querySelector('.card-label');
+      const body = card.querySelector('.card-body');
+      if (!labelEl || !body) return;
+      const linhas = _copiaLinhasDoCard(body);
+      if (!linhas.length) return;                                     // card vazio/não carregado
+      const bloco = ['', '----- ' + clean(labelEl.innerText) + ' -----'];
+      linhas.forEach(function(x){ bloco.push(x); });
+      blocos.push(bloco.join('\n'));
+    });
+    if (!blocos.length) return;                                       // aba sem conteúdo visível
     L.push('');
-    L.push('===== ' + (labelEl.innerText || '').replace(/\s+/g,' ').trim().toUpperCase() + ' =====');
-    linhas.forEach(function(x){ L.push(x); });
+    L.push('═════ ' + rotuloAba(t).toUpperCase() + ' ═════');
+    blocos.forEach(function(b){ L.push(b); });
   });
 
   L.push('');
