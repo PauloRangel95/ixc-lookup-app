@@ -1759,8 +1759,13 @@ function render(d) {
   });
 
   // Carregar OLT Cloud em paralelo
-  if (d.logins?.length>0) buscarOLT(d.logins).catch(e=>console.warn('OLT:',e));
-  if (d.logins?.length>0) buscarOZmap(d.logins).catch(e=>console.warn('OZmap:',e));
+  // OLT primeiro (sinal em tempo real = prioridade); OZmap (estático) só depois,
+  // pra não competir com o OLT pelas conexões do mesmo n8n.
+  if (d.logins?.length>0) {
+    buscarOLT(d.logins)
+      .catch(e=>console.warn('OLT:',e))
+      .finally(()=>{ buscarOZmap(d.logins).catch(e=>console.warn('OZmap:',e)); });
+  }
 
   // Log
   Logger.registrarLog(sessaoAtual,'CONSULTA_CONTRATO',{
