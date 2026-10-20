@@ -860,142 +860,69 @@ function tempCls(v){
   return 'verde';
 }
 
-// Respeita a visão do colaborador: o "copiar tudo" só inclui as seções cujo card
-// NÃO foi escondido pela camada de permissões (permissoes.js). Verifica apenas a
-// classe .ixc-perm-hidden — o display:none de troca de aba é navegação normal e
-// não restringe acesso. Card ausente nesta consulta => não restringe.
-function _secaoPermitida(cardId) {
-  const body = document.getElementById('body-' + cardId);
-  if (!body) return true;
-  const card = body.closest('.card');
-  if (!card) return true;
-  return !card.classList.contains('ixc-perm-hidden');
+// "Copiar tudo" = copia EXATAMENTE o que está na tela, agrupado por card/seção.
+// Puxa do DOM renderizado: assim respeita a visão do colaborador (cards escondidos
+// pela permissão têm .ixc-perm-hidden e são pulados) e nunca "esquece" um campo novo.
+// Senha: usa o valor real em data-pass (mesmo mascarada na tela).
+function _copiaLinhasDoCard(body) {
+  const out = [];
+  const SEL = '.item-header, .sec-title, .row, .meta-row, .olt-item, .olt-alarme, .olt-status-msg, .info-box';
+  body.querySelectorAll(SEL).forEach(function(n) {
+    if (n.classList.contains('ixc-perm-hidden')) return;
+    const clean = function(s){ return (s||'').replace(/\s+/g,' ').trim(); };
+    if (n.classList.contains('item-header')) {
+      const t = n.querySelector('.item-title'), s = n.querySelector('.item-sub');
+      const txt = clean((t?t.innerText:'') + (s?(' — '+s.innerText):''));
+      if (txt) { out.push(''); out.push('• ' + txt); }
+    } else if (n.classList.contains('sec-title')) {
+      const t = clean(n.innerText);
+      if (t) out.push('  [' + t + ']');
+    } else if (n.classList.contains('row') || n.classList.contains('meta-row')) {
+      const k = n.querySelector('.row-key,.meta-key');
+      const pd = n.querySelector('.pass-display');
+      const v = n.querySelector('.row-val,.meta-val');
+      const key = k ? clean(k.innerText) : '';
+      let val = pd ? (pd.getAttribute('data-pass') || pd.innerText) : (v ? v.innerText : '');
+      val = clean(val);
+      if (key && val) out.push('  ' + key + ': ' + val);
+      else { const t = clean(n.innerText); if (t) out.push('  ' + t); }
+    } else if (n.classList.contains('olt-item')) {
+      const k = n.querySelector('.olt-label'), v = n.querySelector('.olt-val');
+      if (k && v) out.push('  ' + clean(k.innerText) + ': ' + clean(v.innerText));
+    } else if (n.classList.contains('olt-alarme') || n.classList.contains('olt-status-msg') || n.classList.contains('info-box')) {
+      const t = clean(n.innerText);
+      if (t) out.push('  ' + t);
+    }
+  });
+  return out;
 }
 
 function copiarTudo() {
   const d = dadosAtual;
-  if (!d) return;
-  const c = d.contrato, cl = d.cliente, fin = d.financeiro;
-  const sep = '\n';
+  const root = document.getElementById('results');
+  if (!d || !root) return;
   const L = [];
-
   L.push('==============================');
-  L.push('Cliente: ' + cl.nome);
-  if (_secaoPermitida('cliente')) L.push('CPF/CNPJ: ' + (cl.cpf||'---'));
+  if (d.cliente && d.cliente.nome) L.push('Cliente: ' + d.cliente.nome);
+  if (d.contrato && (d.contrato.numero || d.contrato.id)) L.push('Contrato: #' + (d.contrato.numero || d.contrato.id));
   L.push('==============================');
 
-  if (_secaoPermitida('contrato')) {
-  L.push('');
-  L.push('-- CONTRATO --');
-  L.push('N contrato: ' + c.numero);
-  L.push('Status: ' + c.status);
-  L.push('Status acesso: ' + (c.status_acesso||'---'));
-  L.push('Plano: ' + (c.plano||'---'));
-  L.push('Velocidade: ' + (c.velocidade||'---'));
-  L.push('Vencimento: ' + (c.vencimento||'---'));
-  if (c.mensalidade) L.push('Mensalidade: R$ ' + c.mensalidade);
-  if (c.pago_ate) L.push('Pago até: ' + c.pago_ate);
-  if (c.data_ativacao) L.push('Ativação: ' + c.data_ativacao);
-  if (c.data_renovacao) L.push('Última renovação: ' + c.data_renovacao);
-  if (c.data_expiracao) L.push('Expiração: ' + c.data_expiracao);
-  if (c.fidelidade) L.push('Fidelidade: ' + c.fidelidade + ' meses');
-  if (c.desbloqueio_conf) L.push('Desbl. conf.: ' + c.desbloqueio_conf);
-  }
-
-  if (_secaoPermitida('fin-ajustes') && ((d.acrescimos && d.acrescimos.length) || (d.descontos && d.descontos.length))) {
+  root.querySelectorAll('.card').forEach(function(card) {
+    if (card.classList.contains('ixc-perm-hidden')) return;          // escondido pela permissão
+    const labelEl = card.querySelector('.card-label');
+    const body = card.querySelector('.card-body');
+    if (!labelEl || !body) return;
+    const linhas = _copiaLinhasDoCard(body);
+    if (!linhas.length) return;                                       // card vazio/não carregado
     L.push('');
-    L.push('-- ACRÉSCIMOS / DESCONTOS --');
-    (d.acrescimos||[]).forEach(function(x){ L.push('Acréscimo: + R$ ' + (x.valor||'-') + (x.descricao?' - '+x.descricao:'')); });
-    (d.descontos||[]).forEach(function(x){ L.push('Desconto: - R$ ' + (x.valor||'-') + (x.descricao?' - '+x.descricao:'')); });
-  }
-
-  if (_secaoPermitida('cliente')) {
-  L.push('');
-  L.push('-- CLIENTE --');
-  if (cl.whatsapp||cl.celular) L.push('WhatsApp/Cel: ' + (cl.whatsapp||cl.celular));
-  if (cl.telefone) L.push('Telefone: ' + cl.telefone);
-  if (cl.email)    L.push('E-mail: ' + cl.email);
-  if (cl.endereco) L.push('Endereco: ' + cl.endereco);
-  }
-
-  if (_secaoPermitida('logins') && d.logins && d.logins.length) {
-    L.push('');
-    L.push('-- LOGINS PPPoE --');
-    d.logins.forEach(function(l) {
-      L.push('Login: ' + l.login);
-      if (l.senha||l.password) L.push('  Senha: ' + (l.senha||l.password));
-      L.push('  Status: ' + (l.status_acesso||l.online||'---'));
-      L.push('  IP: ' + (l.ip||'---'));
-      if (l.mac) L.push('  MAC: ' + l.mac);
-      if (l.onu_mac) L.push('  ONU MAC: ' + l.onu_mac);
-      if (l.conexao) L.push('  Conexao: ' + l.conexao);
-      var oz = (d._ozmap||{})[String(l.id)];
-      if (oz && oz.encontrado) {
-        if (oz.caixa && oz.caixa.nome) L.push('  CTO (OZmap): ' + oz.caixa.nome + (oz.caixa.tipo?(' ['+oz.caixa.tipo+']'):''));
-        if (oz.porta!=null)  L.push('  Porta: ' + oz.porta);
-        if (oz.drop_m!=null) L.push('  Drop: ' + oz.drop_m + ' m');
-      }
-    });
-  }
-
-  if (_secaoPermitida('fin') && fin && fin.titulos && fin.titulos.length) {
-    L.push('');
-    L.push('-- FINANCEIRO --');
-    var SF = {A:'Em aberto',C:'Pago',B:'Baixado',P:'Pago parcial'};
-    fin.titulos.forEach(function(t) {
-      var vencido = t.status==='A' && new Date(t.vencimento) < new Date();
-      L.push('Titulo: R$ ' + t.valor + ' - Venc: ' + t.vencimento + ' - ' + (vencido?'VENCIDO':(SF[t.status]||t.status)));
-    });
-  }
-
-  if (_secaoPermitida('os-ab') && d.os_abertas && d.os_abertas.length) {
-    L.push('');
-    L.push('-- OS ABERTAS --');
-    d.os_abertas.forEach(function(o) {
-      L.push('OS #' + o.id + ': ' + (o.assunto||'---') + ' [' + (o.status||'---') + ']');
-    });
-  }
-
-  if (_secaoPermitida('os-en') && d.os_encerradas && d.os_encerradas.length) {
-    L.push('');
-    L.push('-- OS ENCERRADAS --');
-    d.os_encerradas.forEach(function(o) {
-      L.push('OS #' + o.id + ': ' + (o.assunto||'---') + ' [' + (o.status||'---') + ']');
-    });
-  }
-
-  if (_secaoPermitida('comodatos') && d.comodatos && d.comodatos.length) {
-    L.push('');
-    L.push('-- COMODATOS --');
-    d.comodatos.forEach(function(co) {
-      L.push((co.produto||co.nome_produto||'Equip.') + ' - Serial: ' + (co.serial||'---') + ' - MAC: ' + (co.mac||'---'));
-    });
-  }
-
-  // OLT Cloud
-  var oltCloud = d._olt_cloud || {};
-  var oltEntries = Object.values(oltCloud).filter(function(o) { return o && o.sinal_onu != null; });
-  if (_secaoPermitida('logins') && oltEntries.length) {
-    L.push('');
-    L.push('-- OLT CLOUD --');
-    oltEntries.forEach(function(olt) {
-      if (olt.serial)     L.push('Serial ONU: ' + olt.serial);
-      if (olt.modelo)     L.push('Modelo: ' + olt.modelo);
-      if (olt.olt)        L.push('OLT: ' + olt.olt);
-      if (olt.slot_pon_onu) L.push('Slot/PON/ONU: ' + olt.slot_pon_onu);
-      if (olt.sinal_onu != null) L.push('RX ONU: ' + parseFloat(olt.sinal_onu).toFixed(2) + ' dBm');
-      if (olt.sinal_olt != null) L.push('RX OLT: ' + parseFloat(olt.sinal_olt).toFixed(2) + ' dBm');
-      if (olt.temperatura != null) L.push('Temperatura: ' + parseFloat(olt.temperatura).toFixed(1) + 'C');
-      if (olt.tensao != null)      L.push('Tensao: ' + parseFloat(olt.tensao).toFixed(2) + ' V');
-      if (olt.uptime)              L.push('Uptime: ' + olt.uptime);
-      if (olt.status)              L.push('Status OLT: ' + olt.status);
-    });
-  }
+    L.push('===== ' + (labelEl.innerText || '').replace(/\s+/g,' ').trim().toUpperCase() + ' =====');
+    linhas.forEach(function(x){ L.push(x); });
+  });
 
   L.push('');
   L.push('==============================');
 
-  navigator.clipboard.writeText(L.join(sep)).then(function() {
+  navigator.clipboard.writeText(L.join('\n')).then(function() {
     toast('Tudo copiado!', 'ok');
   }).catch(function() {
     toast('Erro ao copiar', 'err');
