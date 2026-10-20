@@ -1731,6 +1731,7 @@ function render(d) {
     if(o.diagnostico) b+=infoBox('Diagnóstico',o.diagnostico,'diag');
     if(o.mensagem) b+=infoBox('Mensagem',o.mensagem);
     if(o.mensagem_resposta) b+=infoBox('Atualização',o.mensagem_resposta,'resp');
+    b+=`<div class="ozmap-os-section" style="margin-top:6px"></div>`; // resumo OZmap (preenchido após buscarOZmap)
     const labelAg = o.status_raw === 'AG' ? '🔄 Reagendar' : '📅 Agendar';
     b+=`<div class="btns">
       <button class="btn-sm btn-yellow" data-action="abrir-agendar" data-p="${o.id}" data-p2="${(o.assunto||'').replace(/"/g,'&quot;')}">${labelAg}</button>
@@ -2281,41 +2282,48 @@ function atualizarOLTStatus(msg,cor) {
 
 // ── Rede OZmap (Fase 1 — leitura: CTO, porta, drop real, coords) ──
 function secTOZ(){ return '<div class="sec-title">Rede (OZmap)</div>'; }
+function renderOZmapHTML(d) {
+  const cx = d.caixa || {};
+  const tipoB = cx.tipo ? ' ' + badge(cx.tipo, 'azul') : '';
+  const implB = ' ' + (cx.implantada ? badge('Implantada','verde') : badge('Planejada','amarelo'));
+  let h = secTOZ();
+  h += mrow('Caixa (CTO)', (cx.nome || '—') + tipoB + implB);
+  h += mrow('Porta',     d.porta != null ? String(d.porta) : null);
+  h += mrow('Drop real', d.drop_m != null ? (d.drop_m + ' m') : null);
+  if (d.onu && (d.onu.serial || d.onu.pppoe)) h += mrow('ONU (OZmap)', [d.onu.serial, d.onu.pppoe].filter(Boolean).join(' · '));
+  if (d.endereco) h += mrow('Endereço', d.endereco);
+  const cc = Array.isArray(d.coords_cliente) ? d.coords_cliente : null; // [lng, lat]
+  const cb = (cx.coords && Array.isArray(cx.coords)) ? cx.coords : null; // [lng, lat]
+  let btns = '';
+  if (cc) btns += `<button class="btn-sm btn-blue" data-action="link" data-p="https://www.google.com/maps?q=${cc[1]},${cc[0]}">📍 Cliente no mapa</button>`;
+  if (cb) btns += `<button class="btn-sm btn-gray" data-action="link" data-p="https://www.google.com/maps?q=${cb[1]},${cb[0]}">📦 Caixa no mapa</button>`;
+  if (btns) h += `<div class="btns">${btns}</div>`;
+  return h;
+}
 async function buscarOZmap(logins) {
+  const resultados = new Array(logins.length).fill(null);
   await Promise.all(logins.map(async (l, i) => {
     const sec = document.getElementById('ozmap-' + i);
-    if (!sec) return;
     try {
       const res = await fetch(WEBHOOK_OZMAP, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ login_id: String(l.id) })
       });
       const d = await res.json();
-      if (!d || d.ok === false) { sec.innerHTML = secTOZ() + '<div class="olt-status-msg amarelo">⚠ OZmap indisponível</div>'; return; }
-      if (!d.encontrado) { sec.innerHTML = secTOZ() + '<div class="olt-status-msg cinza">Login não mapeado no OZmap</div>'; return; }
-
-      const cx = d.caixa || {};
-      const tipoB = cx.tipo ? ' ' + badge(cx.tipo, 'azul') : '';
-      const implB = ' ' + (cx.implantada ? badge('Implantada','verde') : badge('Planejada','amarelo'));
-      let h = secTOZ();
-      h += mrow('Caixa (CTO)', (cx.nome || '—') + tipoB + implB);
-      h += mrow('Porta',     d.porta != null ? String(d.porta) : null);
-      h += mrow('Drop real', d.drop_m != null ? (d.drop_m + ' m') : null);
-      if (d.onu && (d.onu.serial || d.onu.pppoe)) h += mrow('ONU (OZmap)', [d.onu.serial, d.onu.pppoe].filter(Boolean).join(' · '));
-      if (d.endereco) h += mrow('Endereço', d.endereco);
-
-      const cc = Array.isArray(d.coords_cliente) ? d.coords_cliente : null; // [lng, lat]
-      const cb = (cx.coords && Array.isArray(cx.coords)) ? cx.coords : null; // [lng, lat]
-      let btns = '';
-      if (cc) btns += `<button class="btn-sm btn-blue" data-action="link" data-p="https://www.google.com/maps?q=${cc[1]},${cc[0]}">📍 Cliente no mapa</button>`;
-      if (cb) btns += `<button class="btn-sm btn-gray" data-action="link" data-p="https://www.google.com/maps?q=${cb[1]},${cb[0]}">📦 Caixa no mapa</button>`;
-      if (btns) h += `<div class="btns">${btns}</div>`;
-
-      sec.innerHTML = h;
+      if (!d || d.ok === false) { if (sec) sec.innerHTML = secTOZ() + '<div class="olt-status-msg amarelo">⚠ OZmap indisponível</div>'; return; }
+      if (!d.encontrado) { if (sec) sec.innerHTML = secTOZ() + '<div class="olt-status-msg cinza">Login não mapeado no OZmap</div>'; return; }
+      resultados[i] = d;
+      if (sec) sec.innerHTML = renderOZmapHTML(d);
     } catch(e) {
-      sec.innerHTML = secTOZ() + '<div class="olt-status-msg amarelo">⚠ Erro ao consultar OZmap</div>';
+      if (sec) sec.innerHTML = secTOZ() + '<div class="olt-status-msg amarelo">⚠ Erro ao consultar OZmap</div>';
     }
   }));
+  // Resumo da rede dentro das OS abertas (mesma instalação física do contrato)
+  const ozPrimeiro = resultados.find(r => r && r.encontrado);
+  document.querySelectorAll('.ozmap-os-section').forEach(s => {
+    if (ozPrimeiro) s.innerHTML = renderOZmapHTML(ozPrimeiro);
+    else s.remove(); // sem dado no OZmap: não polui a OS
+  });
 }
 
 async function buscarOLT(logins) {
