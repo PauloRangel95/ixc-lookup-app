@@ -16,8 +16,15 @@
 1. Login dá **"não mapeado"** → botão **"Mapear no OZmap"**.
 2. **Escolher CTO:** lista as caixas próximas às coords do cliente (leitura `boxes` com filtro NEAR) ou busca por nome.
 3. **Escolher porta:** mostra portas livres/ocupadas do splitter da CTO (leitura).
-4. **Conferir dados** (código=9441, nome, coords, endereço — vindos do IXC).
-5. **Confirmar** → cria no OZmap.
+4. **Desenhar o drop (mapa):** o técnico traça o caminho real do cabo → vira `drop_poles` (NÃO é linha reta).
+5. **Conferir dados** (código=9441, nome, coords, endereço — vindos do IXC).
+6. **Confirmar** → cria no OZmap.
+
+## Desenho do drop (decisão)
+O `drop_poles` é uma **sequência ordenada de postes/pontos** (ids de BasePoint no OZmap). Duas formas:
+- **(a) Ligar postes existentes** (recomendado): mapa mostra CTO, cliente e os postes já cadastrados; o técnico toca na ordem (CTO → postes → cliente). Não cria elementos novos.
+- **(b) Desenho livre**: o técnico desenha vértices; criamos `points` novos no OZmap para cada um e usamos no `drop_poles`. Mais flexível, mais escrita/risco.
+- **Mapa no PWA:** biblioteca leve (ex.: Leaflet) com os postes/CTO/cliente plotados a partir das coords do OZmap.
 
 ## Chamada de criação (OZmap)
 `POST /api/v2/properties` (SDK `property.create`):
@@ -31,7 +38,7 @@
   "address": "<endereço>",
   "auto_connect": true,
   "port": <porta>,
-  "drop_poles": [ "<pointId>", ... ]   // opcional no MVP
+  "drop_poles": [ "<pointId>", ... ]   // CAMINHO DESENHADO pelo técnico (não linha reta)
 }
 ```
 - `project` e o splitter saem da **CTO escolhida** (box.project; splitter por `parent==boxId`).
