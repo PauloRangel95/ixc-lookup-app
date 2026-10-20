@@ -2307,7 +2307,7 @@ async function buscarOZmap(logins) {
     try {
       const res = await fetch(WEBHOOK_OZMAP, {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ login_id: String(l.id) })
+        body: JSON.stringify({ login_id: String(l.id), login: l.login || '', onu_mac: l.onu_mac || '' })
       });
       const d = await res.json();
       if (!d || d.ok === false) { if (sec) sec.innerHTML = secTOZ() + '<div class="olt-status-msg amarelo">⚠ OZmap indisponível</div>'; return; }
