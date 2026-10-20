@@ -54,7 +54,10 @@ async function ozGet(token, pathq, bodyObj) {
 // Listagem com filtro no CORPO de um GET (igual ao SDK). page começa em 1. operador '=' .
 async function ozList(token, rota, filtro, limit=1) {
   try {
-    const r = await ozGet.call(this, token, `${rota}?page=1&limit=${limit}`, filtro ? { filter: filtro } : undefined);
+    // Filtro vai na query string (?filter=JSON) E no corpo — cobre as duas formas do OZmap.
+    let q = `page=1&limit=${limit}`;
+    if (filtro) q += '&filter=' + encodeURIComponent(JSON.stringify(filtro));
+    const r = await ozGet.call(this, token, `${rota}?${q}`, filtro ? { filter: filtro } : undefined);
     return (r && Array.isArray(r.rows)) ? r.rows : [];
   } catch(e) { throw new Error('['+rota+'] ' + errInfo(e)); }
 }
@@ -71,6 +74,12 @@ try {
     [{ property:'code', operator:'=', value: loginId }], 1);
   const cli = clientes[0];
   if (!cli) return [{ json:{ ok:true, encontrado:false, motivo:'login não localizado no OZmap' } }];
+  // Guarda: se o filtro NÃO aplicou, o OZmap devolve o 1º cliente (code != login).
+  // Nesse caso NÃO mostramos dado errado — sinalizamos que o filtro falhou.
+  if (String(cli.code) !== String(loginId)) {
+    return [{ json:{ ok:true, encontrado:false, filtro_falhou:true,
+      motivo:'filtro não aplicou (OZmap devolveu code '+cli.code+' para login '+loginId+')' } }];
+  }
   const cliId = cli.id || cli._id;
 
   // 2) imóvel do cliente
@@ -79,6 +88,12 @@ try {
   const imv = imoveis[0];
   if (!imv) return [{ json:{ ok:true, encontrado:false, motivo:'imóvel não localizado',
     onu: cli.onu||null, status_cliente: cli.status } }];
+  // Guarda: o imóvel tem que ser do cliente que achamos (senão o filtro de properties falhou).
+  const imvClient = (imv.client && (imv.client.id || imv.client._id)) || imv.client;
+  if (imvClient && String(imvClient) !== String(cliId)) {
+    return [{ json:{ ok:true, encontrado:false, filtro_falhou:true,
+      motivo:'imóvel não bateu com o cliente (filtro de properties não aplicou)' } }];
+  }
 
   // 3) caixa + drop (+ tipo de caixa) em paralelo
   const boxId = imv.box || null, dropId = imv.drop || null;
