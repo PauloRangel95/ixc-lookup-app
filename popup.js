@@ -2439,6 +2439,37 @@ function _ozSalvarPreview(){
     } catch(e){ msg.style.color='var(--r)'; msg.textContent='❌ '+(e.message||'erro'); btnCriar.disabled=false; btnCriar.textContent='✅ Criar no OZmap'; }
   };
 }
+async function _ozCarregarArea(lat, lng){
+  var st=_ozEstado; if(!st||!st.map) return; var map=st.map;
+  _ozStatus('Buscando CTOs e postes do OZmap...');
+  if (st.layerBase){ try{ map.removeLayer(st.layerBase); }catch(e){} }
+  st.layerBase=L.layerGroup().addTo(map);
+  st.posteMarkers={};
+  try {
+    var res=await fetch(WEBHOOK_OZMAP_MAPA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:lat,lng:lng,radius:500})});
+    var d=await res.json();
+    if (!d||!d.ok){ _ozStatus('❌ Erro ao carregar o mapa do OZmap'); return; }
+    st.caixas=d.caixas||[]; st.postes=d.postes||[];
+    st.postes.forEach(function(p){
+      if(!p.coords) return;
+      var m=L.circleMarker([p.coords[1],p.coords[0]],{radius:5,color:'#8aa4d0',weight:1,fillColor:'#8aa4d0',fillOpacity:.6,bubblingMouseEvents:false});
+      m.addTo(st.layerBase); m.bindTooltip('poste');
+      m.on('click', function(){ _ozClicarPoste(p, m); });
+      st.posteMarkers[p.id]=m;
+    });
+    st.caixas.forEach(function(cx){
+      if(!cx.coords) return;
+      var isCTO=(cx.tipo||'').toUpperCase().indexOf('CTO')===0;
+      var m=L.circleMarker([cx.coords[1],cx.coords[0]],{radius:9,color:isCTO?'#00c4ff':'#b060ff',weight:2,fillColor:isCTO?'#00c4ff':'#b060ff',fillOpacity:.6,bubblingMouseEvents:false});
+      m.addTo(st.layerBase); m.bindTooltip(cx.nome+' ('+(cx.tipo||'')+')');
+      m.on('click', function(){ _ozSelecionarCTO(cx, m); });
+    });
+    _ozRecolorPostes(); // mantém verdes os postes que já estão na rota
+    var info=document.getElementById('ozmap-mapa-info'); if(info) info.textContent=(st.caixas.length)+' caixas · '+(st.postes.length)+' postes';
+    _ozStatus(st.statusBase || '1) CTO  2) postes  3) casa do cliente');
+    setTimeout(function(){ try{map.invalidateSize();}catch(e){} },150);
+  } catch(e){ _ozStatus('❌ '+(e.message||'erro')); }
+}
 window.abrirMapaOZmap = async function(login_id, login){
   var modal=document.getElementById('ozmap-mapa-modal');
   if (!modal){
@@ -2453,7 +2484,8 @@ window.abrirMapaOZmap = async function(login_id, login){
       +'</div>'
       +'<div id="ozmap-mapa-canvas" style="flex:1;min-height:0"></div>'
       +'<div style="padding:8px 12px;background:var(--bg2);border-top:1px solid var(--b);display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-      +'  <span id="ozmap-mapa-status" style="flex:1;min-width:160px;font-size:11px;color:var(--tx2)">Carregando...</span>'
+      +'  <span id="ozmap-mapa-status" style="flex:1;min-width:140px;font-size:11px;color:var(--tx2)">Carregando...</span>'
+      +'  <button class="btn-sm btn-gray" id="ozmap-mapa-recarregar" title="Recarregar CTOs/postes na área que está vendo">↻ CTOs aqui</button>'
       +'  <button class="btn-sm btn-gray" id="ozmap-mapa-desfazer">↶ Desfazer</button>'
       +'  <button class="btn-sm btn-gray" id="ozmap-mapa-limpar">🗑 Limpar</button>'
       +'  <button class="btn-sm btn-blue" id="ozmap-mapa-salvar">💾 Ver dados p/ criar</button>'
@@ -2463,26 +2495,27 @@ window.abrirMapaOZmap = async function(login_id, login){
     modal.querySelector('#ozmap-mapa-desfazer').onclick=_ozDesfazer;
     modal.querySelector('#ozmap-mapa-limpar').onclick=_ozLimpar;
     modal.querySelector('#ozmap-mapa-salvar').onclick=_ozSalvarPreview;
+    modal.querySelector('#ozmap-mapa-recarregar').onclick=function(){ var st=_ozEstado; if(st&&st.map){ var c=st.map.getCenter(); _ozCarregarArea(c.lat,c.lng); } };
   }
   modal.style.display='flex';
   _ozStatus('Carregando mapa...');
   try { await _carregarLeaflet(); } catch(e){ _ozStatus('❌ '+e.message); return; }
 
-  // Centro: coordenada do CLIENTE no IXC (radusuarios) → GPS → fallback área padrão
-  var center=null, clienteIXC=null;
+  // Centro: coordenada do CLIENTE no IXC (radusuarios) → GPS do técnico → fallback área padrão
+  var center=null, clienteIXC=null, centerSource='padrao';
   _ozStatus('Localizando o cliente no IXC...');
   try {
     var rr=await ixcGet('radusuarios', { qtype:'radusuarios.id', query:String(login_id), oper:'=', page:'1', rp:'1', sortname:'radusuarios.id', sortorder:'asc' });
     var reg=rr && rr.registros && rr.registros[0];
-    if (reg){ var c=_ozCoord(reg.latitude,reg.longitude)||_ozCoordStr(reg.complemento)||_ozCoordStr(reg.referencia); if(c){ center=[c[0],c[1]]; clienteIXC=c; } }
+    if (reg){ var c=_ozCoord(reg.latitude,reg.longitude)||_ozCoordStr(reg.complemento)||_ozCoordStr(reg.referencia); if(c){ center=[c[0],c[1]]; clienteIXC=c; centerSource='cliente'; } }
   } catch(e){}
-  if (!center){ try { var pos=await new Promise(function(res,rej){ navigator.geolocation.getCurrentPosition(res,rej,{timeout:4000,maximumAge:60000}); }); center=[pos.coords.latitude,pos.coords.longitude]; } catch(e){} }
+  if (!center){ try { var pos=await new Promise(function(res,rej){ navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000,maximumAge:60000,enableHighAccuracy:true}); }); center=[pos.coords.latitude,pos.coords.longitude]; centerSource='gps'; } catch(e){} }
   if (!center) center=[-6.09853457,-49.86056908];
 
   var canvas=modal.querySelector('#ozmap-mapa-canvas'); canvas.innerHTML='';
   var map=L.map(canvas).setView(center,18);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map);
-  _ozEstado={ login_id:login_id, login:login, map:map, caixas:[], postes:[], posteMarkers:{}, ctoSel:null, _ctoMarker:null, rota:[], cliente:null, polyline:null, clienteMarker:null };
+  _ozEstado={ login_id:login_id, login:login, map:map, caixas:[], postes:[], posteMarkers:{}, layerBase:null, statusBase:'', ctoSel:null, _ctoMarker:null, rota:[], cliente:null, polyline:null, clienteMarker:null };
   // Clique em espaço vazio = marca/move a casa do cliente
   map.on('click', function(e){ _ozSetCliente(e.latlng); });
   // Corrige "clique deslocado" (mobile): recalcula o tamanho do mapa após o layout fechar
@@ -2491,35 +2524,12 @@ window.abrirMapaOZmap = async function(login_id, login){
   window.addEventListener('orientationchange', _ozEstado._fix);
   requestAnimationFrame(_ozEstado._fix);
   setTimeout(_ozEstado._fix,120); setTimeout(_ozEstado._fix,450); setTimeout(_ozEstado._fix,1000);
-  // Pré-marca a casa do cliente na coord do IXC (o técnico pode mover clicando no mapa)
-  if (clienteIXC){ _ozEstado.cliente={lat:clienteIXC[0],lng:clienteIXC[1]}; _ozEstado.clienteMarker=L.marker([clienteIXC[0],clienteIXC[1]]).addTo(map).bindTooltip('Casa do cliente (IXC)'); }
+  // Pré-marca a casa: coord do IXC, ou (se veio do GPS) a posição do técnico — o técnico ajusta clicando
+  var preC = clienteIXC || (centerSource==='gps' ? center : null);
+  if (preC){ _ozEstado.cliente={lat:preC[0],lng:preC[1]}; _ozEstado.clienteMarker=L.marker([preC[0],preC[1]]).addTo(map).bindTooltip(centerSource==='cliente'?'Casa do cliente (IXC)':'Sua localização (ajuste)'); }
+  _ozEstado.statusBase=(centerSource==='cliente'?'📍 cliente (IXC)':centerSource==='gps'?'📍 sua localização':'📍 área padrão')+' · clique CTO → postes → casa';
 
-  _ozStatus('Buscando CTOs e postes do OZmap...');
-  try {
-    var res=await fetch(WEBHOOK_OZMAP_MAPA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:center[0],lng:center[1],radius:500})});
-    var d=await res.json();
-    if (!d||!d.ok){ _ozStatus('❌ Erro ao carregar o mapa do OZmap'); return; }
-    _ozEstado.caixas=d.caixas||[]; _ozEstado.postes=d.postes||[];
-    // Postes (clicáveis; bubblingMouseEvents:false p/ o clique não vazar pro mapa)
-    _ozEstado.postes.forEach(function(p){
-      if(!p.coords) return;
-      var m=L.circleMarker([p.coords[1],p.coords[0]],{radius:5,color:'#8aa4d0',weight:1,fillColor:'#8aa4d0',fillOpacity:.6,bubblingMouseEvents:false}).addTo(map);
-      m.bindTooltip('poste');
-      m.on('click', function(){ _ozClicarPoste(p, m); });
-      _ozEstado.posteMarkers[p.id]=m;
-    });
-    // CTOs/CDs (clicáveis)
-    _ozEstado.caixas.forEach(function(cx){
-      if(!cx.coords) return;
-      var isCTO=(cx.tipo||'').toUpperCase().indexOf('CTO')===0;
-      var m=L.circleMarker([cx.coords[1],cx.coords[0]],{radius:9,color:isCTO?'#00c4ff':'#b060ff',weight:2,fillColor:isCTO?'#00c4ff':'#b060ff',fillOpacity:.6,bubblingMouseEvents:false}).addTo(map);
-      m.bindTooltip(cx.nome+' ('+(cx.tipo||'')+')');
-      m.on('click', function(){ _ozSelecionarCTO(cx, m); });
-    });
-    var info=modal.querySelector('#ozmap-mapa-info'); if(info) info.textContent=(d.caixas?d.caixas.length:0)+' caixas · '+(d.postes?d.postes.length:0)+' postes';
-    _ozStatus('1) Clique na CTO (azul)  2) Clique nos postes do caminho  3) Clique na casa do cliente');
-    setTimeout(function(){ try{map.invalidateSize();}catch(e){} },200);
-  } catch(e){ _ozStatus('❌ '+(e.message||'erro')); }
+  await _ozCarregarArea(center[0], center[1]);
 };
 
 async function buscarOLT(logins) {
