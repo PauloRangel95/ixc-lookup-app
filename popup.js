@@ -9,6 +9,8 @@ const WEBHOOK_ACOES    = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/i
 const WEBHOOK_LEITURAS = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-leituras';
 const WEBHOOK_OZMAP    = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-ozmap'; // rede física (OZmap) por login
 const WEBHOOK_OZMAP_MAPA = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-ozmap-mapa'; // CTOs+postes p/ o mapa (Fase 3)
+const WEBHOOK_OZMAP_CRIAR = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-ozmap-criar'; // criar/apagar no OZmap (Fase 3, escrita)
+const OZMAP_CRIAR_LOGIN_TESTE = '9441'; // nesta fase, criação liberada só p/ este login de teste
 const WEBHOOK_HISTSZ   = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-histsz'; // histórico SZ Chat (Supabase via n8n)
 
 // ── Toggle de token (v1.6) ──
@@ -2380,7 +2382,8 @@ function _ozSalvarPreview(){
   if (!st.cliente){ toast('Marque a casa do cliente (clique no mapa)','err'); return; }
   var drop_poles = st.rota.map(function(p){return p.id;});
   var payload = {
-    kind:'property',
+    acao:'criar',
+    login_id:String(st.login_id),
     client:{ code:String(st.login_id), name:(dadosAtual&&dadosAtual.cliente&&dadosAtual.cliente.nome)||null },
     box: st.ctoSel.id,
     coords:[st.cliente.lng, st.cliente.lat],
@@ -2388,23 +2391,52 @@ function _ozSalvarPreview(){
     drop_poles: drop_poles
   };
   console.log('[OZmap criar payload]', payload);
+  var podeGravar = String(st.login_id) === OZMAP_CRIAR_LOGIN_TESTE;
   var ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:16px';
-  ov.innerHTML='<div style="background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:18px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6)">'
-    +'<h3 style="font-family:var(--font-head);color:var(--acc);margin-bottom:10px">📋 Dados para criar no OZmap</h3>'
+  ov.innerHTML='<div style="background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:18px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6)">'
+    +'<h3 style="font-family:var(--font-head);color:var(--acc);margin-bottom:10px">📋 Revisão — criar no OZmap</h3>'
     +'<div style="font-size:12px;color:var(--tx);line-height:1.8">'
     +'CTO: <strong>'+st.ctoSel.nome+'</strong><br>'
     +'Postes no caminho: <strong>'+drop_poles.length+'</strong><br>'
     +'Cliente (code): <strong>'+st.login_id+'</strong><br>'
     +'Coords: <strong>'+st.cliente.lat.toFixed(6)+', '+st.cliente.lng.toFixed(6)+'</strong>'
     +'</div>'
-    +'<div style="font-size:10px;color:var(--tx3);margin:12px 0">Prévia — ainda <strong>NÃO grava</strong> no OZmap. A gravação entra na próxima etapa (teste no 9441).</div>'
-    +'<div style="display:flex;gap:8px;justify-content:flex-end">'
-    +'<button class="btn-sm btn-blue" id="oz-prev-ok">Entendi</button>'
+    +(podeGravar
+      ? '<div style="font-size:10px;color:var(--y);margin:12px 0">⚠ Ao confirmar, <strong>CRIA de verdade</strong> no OZmap (login de teste '+OZMAP_CRIAR_LOGIN_TESTE+'). Dá pra desfazer logo em seguida.</div>'
+      : '<div style="font-size:10px;color:var(--tx3);margin:12px 0">Nesta fase a criação está liberada só para o login de teste '+OZMAP_CRIAR_LOGIN_TESTE+'. Aqui é só revisão.</div>')
+    +'<div id="oz-prev-msg" style="font-size:11px;margin:4px 0;min-height:14px"></div>'
+    +'<div style="display:flex;gap:8px;justify-content:flex-end" id="oz-prev-btns">'
+    +'<button class="btn-sm btn-gray" id="oz-prev-fechar">Fechar</button>'
+    +(podeGravar?'<button class="btn-sm btn-blue" id="oz-prev-criar">✅ Criar no OZmap</button>':'')
     +'</div></div>';
   document.body.appendChild(ov);
-  ov.querySelector('#oz-prev-ok').onclick=function(){ ov.remove(); };
-  ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+  var fechar=function(){ ov.remove(); };
+  ov.querySelector('#oz-prev-fechar').onclick=fechar;
+  ov.addEventListener('click', function(e){ if(e.target===ov) fechar(); });
+  var msg=ov.querySelector('#oz-prev-msg');
+  var btnCriar=ov.querySelector('#oz-prev-criar');
+  if (btnCriar) btnCriar.onclick=async function(){
+    btnCriar.disabled=true; btnCriar.textContent='⏳ Criando...'; msg.textContent='';
+    try {
+      var r=await fetch(WEBHOOK_OZMAP_CRIAR,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(x){return x.json();});
+      if (!r || !r.ok){ msg.style.color='var(--r)'; msg.textContent='❌ '+((r&&r.erro)||'Falha ao criar'); btnCriar.disabled=false; btnCriar.textContent='✅ Criar no OZmap'; return; }
+      var pid=r.property_id;
+      msg.style.color='var(--g)'; msg.textContent='✅ Criado! id: '+(pid||'—')+(r.conferido?' (conferido)':'');
+      var btns=ov.querySelector('#oz-prev-btns');
+      btns.innerHTML='<button class="btn-sm btn-gray" id="oz-prev-fechar2">Fechar</button>'+(pid?'<button class="btn-sm btn-red" id="oz-prev-undo">↩ Desfazer (apagar)</button>':'');
+      ov.querySelector('#oz-prev-fechar2').onclick=function(){ fechar(); fecharMapaOZmap(); if(dadosAtual&&dadosAtual.logins) buscarOZmap(dadosAtual.logins).catch(function(){}); };
+      var undo=ov.querySelector('#oz-prev-undo');
+      if (undo) undo.onclick=async function(){
+        undo.disabled=true; undo.textContent='⏳ Apagando...';
+        try {
+          var r2=await fetch(WEBHOOK_OZMAP_CRIAR,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({acao:'apagar',property_id:pid})}).then(function(x){return x.json();});
+          if (r2 && r2.ok){ msg.style.color='var(--tx2)'; msg.textContent='↩ Desfeito (apagado no OZmap).'; undo.remove(); }
+          else { msg.style.color='var(--r)'; msg.textContent='❌ '+((r2&&r2.erro)||'Falha ao apagar'); undo.disabled=false; undo.textContent='↩ Desfazer (apagar)'; }
+        } catch(e){ msg.style.color='var(--r)'; msg.textContent='❌ '+(e.message||'erro'); undo.disabled=false; undo.textContent='↩ Desfazer (apagar)'; }
+      };
+    } catch(e){ msg.style.color='var(--r)'; msg.textContent='❌ '+(e.message||'erro'); btnCriar.disabled=false; btnCriar.textContent='✅ Criar no OZmap'; }
+  };
 }
 window.abrirMapaOZmap = async function(login_id, login){
   var modal=document.getElementById('ozmap-mapa-modal');
