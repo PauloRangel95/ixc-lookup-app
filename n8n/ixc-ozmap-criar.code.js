@@ -85,17 +85,17 @@ try {
   if (body.port != null && body.port !== '') base.port = Number(body.port);
 
   // 1) tenta conectar automaticamente numa porta livre da CTO;
-  // 2) se a CTO não tiver conector/porta PON livre, cria SEM conectar (conectado:false).
+  // 2) QUALQUER falha ao conectar → cria SEM conectar (auto_connect:false funciona sempre).
   let criado, conectado = true;
   try {
     criado = await ozReq.call(this,token,'POST','properties', Object.assign({}, base, { auto_connect:true }));
   } catch(e) {
-    const msg = errInfo(e);
-    if (/conector|\bPON\b|porta/i.test(msg)) {
-      try { criado = await ozReq.call(this,token,'POST','properties', Object.assign({}, base, { auto_connect:false })); conectado = false; }
-      catch(e2) { return [{ json:{ ok:false, erro:'OZmap [criar]: ' + errInfo(e2), payload_enviado: base } }]; }
-    } else {
-      return [{ json:{ ok:false, erro:'OZmap [criar]: ' + msg, payload_enviado: base } }];
+    try {
+      criado = await ozReq.call(this,token,'POST','properties', Object.assign({}, base, { auto_connect:false }));
+      conectado = false;
+    } catch(e2) {
+      let dbg=''; try { dbg = JSON.stringify(e2, Object.getOwnPropertyNames(e2)).slice(0,1500); } catch(_){}
+      return [{ json:{ ok:false, erro:'OZmap [criar]: ' + errInfo(e2), erro_autoconnect: errInfo(e), payload_enviado: base, erro_debug: dbg } }];
     }
   }
 
