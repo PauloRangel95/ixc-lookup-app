@@ -2317,6 +2317,8 @@ function _carregarLeaflet() {
   });
 }
 function _ozStatus(txt){ var e=document.getElementById('ozmap-mapa-status'); if(e) e.textContent=txt; }
+function _ozCoord(lat,lng){ var a=parseFloat(lat), b=parseFloat(lng); if(isFinite(a)&&isFinite(b)&&(a!==0||b!==0)&&Math.abs(a)<=90&&Math.abs(b)<=180) return [a,b]; return null; }
+function _ozCoordStr(s){ if(!s) return null; var m=String(s).match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/); if(m){ var a=parseFloat(m[1]), b=parseFloat(m[2]); if(isFinite(a)&&isFinite(b)) return [a,b]; } return null; }
 function _ozRedesenhar(){
   var st=_ozEstado; if(!st||!st.map) return; var map=st.map;
   if (st.polyline){ map.removeLayer(st.polyline); st.polyline=null; }
@@ -2353,7 +2355,6 @@ function _ozClicarPoste(p, marker){
 }
 function _ozSetCliente(latlng){
   var st=_ozEstado; if(!st) return;
-  if (!st.ctoSel){ toast('Clique na CTO de origem primeiro','err'); return; }
   st.cliente={ lat:latlng.lat, lng:latlng.lng };
   if (st.clienteMarker){ try{ st.map.removeLayer(st.clienteMarker); }catch(e){} }
   st.clienteMarker=L.marker([latlng.lat,latlng.lng]).addTo(st.map).bindTooltip('Casa do cliente');
@@ -2467,12 +2468,16 @@ window.abrirMapaOZmap = async function(login_id, login){
   _ozStatus('Carregando mapa...');
   try { await _carregarLeaflet(); } catch(e){ _ozStatus('❌ '+e.message); return; }
 
-  // Centro: GPS do técnico (ele está no cliente) → fallback área padrão
-  var center=[-6.09853457,-49.86056908]; // [lat,lng]
+  // Centro: coordenada do CLIENTE no IXC (radusuarios) → GPS → fallback área padrão
+  var center=null, clienteIXC=null;
+  _ozStatus('Localizando o cliente no IXC...');
   try {
-    var pos=await new Promise(function(res,rej){ navigator.geolocation.getCurrentPosition(res,rej,{timeout:4000,maximumAge:60000}); });
-    center=[pos.coords.latitude,pos.coords.longitude];
+    var rr=await ixcGet('radusuarios', { qtype:'radusuarios.id', query:String(login_id), oper:'=', page:'1', rp:'1', sortname:'radusuarios.id', sortorder:'asc' });
+    var reg=rr && rr.registros && rr.registros[0];
+    if (reg){ var c=_ozCoord(reg.latitude,reg.longitude)||_ozCoordStr(reg.complemento)||_ozCoordStr(reg.referencia); if(c){ center=[c[0],c[1]]; clienteIXC=c; } }
   } catch(e){}
+  if (!center){ try { var pos=await new Promise(function(res,rej){ navigator.geolocation.getCurrentPosition(res,rej,{timeout:4000,maximumAge:60000}); }); center=[pos.coords.latitude,pos.coords.longitude]; } catch(e){} }
+  if (!center) center=[-6.09853457,-49.86056908];
 
   var canvas=modal.querySelector('#ozmap-mapa-canvas'); canvas.innerHTML='';
   var map=L.map(canvas).setView(center,18);
@@ -2486,6 +2491,8 @@ window.abrirMapaOZmap = async function(login_id, login){
   window.addEventListener('orientationchange', _ozEstado._fix);
   requestAnimationFrame(_ozEstado._fix);
   setTimeout(_ozEstado._fix,120); setTimeout(_ozEstado._fix,450); setTimeout(_ozEstado._fix,1000);
+  // Pré-marca a casa do cliente na coord do IXC (o técnico pode mover clicando no mapa)
+  if (clienteIXC){ _ozEstado.cliente={lat:clienteIXC[0],lng:clienteIXC[1]}; _ozEstado.clienteMarker=L.marker([clienteIXC[0],clienteIXC[1]]).addTo(map).bindTooltip('Casa do cliente (IXC)'); }
 
   _ozStatus('Buscando CTOs e postes do OZmap...');
   try {
