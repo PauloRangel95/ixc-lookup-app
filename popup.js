@@ -2319,6 +2319,15 @@ function _carregarLeaflet() {
 function _ozStatus(txt){ var e=document.getElementById('ozmap-mapa-status'); if(e) e.textContent=txt; }
 function _ozCoord(lat,lng){ var a=parseFloat(lat), b=parseFloat(lng); if(isFinite(a)&&isFinite(b)&&(a!==0||b!==0)&&Math.abs(a)<=90&&Math.abs(b)<=180) return [a,b]; return null; }
 function _ozCoordStr(s){ if(!s) return null; var m=String(s).match(/(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)/); if(m){ var a=parseFloat(m[1]), b=parseFloat(m[2]); if(isFinite(a)&&isFinite(b)) return [a,b]; } return null; }
+function _ozDist(aLat,aLng,bLat,bLng){ var R=6371000,dLat=(bLat-aLat)*Math.PI/180,dLng=(bLng-aLng)*Math.PI/180,s1=Math.sin(dLat/2),s2=Math.sin(dLng/2),a=s1*s1+Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*s2*s2; return Math.round(2*R*Math.asin(Math.sqrt(a))); }
+function _ozBuscarCTO(term){
+  var st=_ozEstado; if(!st||!st.caixas) return; term=(term||'').trim().toUpperCase(); if(!term) return;
+  var hit=st.caixas.filter(function(c){return c.coords;}).find(function(c){ return (c.nome||'').toUpperCase().indexOf(term)>=0; });
+  if(!hit){ toast('CTO não encontrada: '+term,'err'); return; }
+  try{ st.map.setView([hit.coords[1],hit.coords[0]],19); }catch(e){}
+  var mk=st.caixaMarkers&&st.caixaMarkers[hit.id];
+  if(mk){ try{ mk.openTooltip(); var r0=mk.options.radius,w0=mk.options.weight; mk.setStyle({radius:16,weight:5}); setTimeout(function(){try{mk.setStyle({radius:r0,weight:w0});}catch(e){}},1400); }catch(e){} }
+}
 function _ozRedesenhar(){
   var st=_ozEstado; if(!st||!st.map) return; var map=st.map;
   if (st.polyline){ map.removeLayer(st.polyline); st.polyline=null; }
@@ -2340,7 +2349,8 @@ function _ozRecolorPostes(){
 }
 function _ozSelecionarCTO(cx, marker){
   var st=_ozEstado; if(!st) return;
-  if (st._ctoMarker){ try{ st._ctoMarker.setStyle({radius:9,weight:2}); }catch(e){} }
+  if (cx && cx.implantada===false) toast('⚠ "'+(cx.nome||'?')+'" é PLANEJADA (não implantada) — confirme se é a CTO real de campo','err');
+  if (st._ctoMarker){ try{ st._ctoMarker.setStyle({radius:(st._ctoMarker._ozR||9),weight:2}); }catch(e){} }
   st.ctoSel=cx; st._ctoMarker=marker;
   if (marker){ try{ marker.setStyle({radius:12,weight:4}); }catch(e){} }
   _ozRedesenhar();
@@ -2444,7 +2454,7 @@ async function _ozCarregarArea(lat, lng){
   _ozStatus('Buscando CTOs e postes do OZmap...');
   if (st.layerBase){ try{ map.removeLayer(st.layerBase); }catch(e){} }
   st.layerBase=L.layerGroup().addTo(map);
-  st.posteMarkers={};
+  st.posteMarkers={}; st.caixaMarkers={};
   try {
     var res=await fetch(WEBHOOK_OZMAP_MAPA,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lat:lat,lng:lng,radius:500})});
     var d=await res.json();
@@ -2457,15 +2467,28 @@ async function _ozCarregarArea(lat, lng){
       m.on('click', function(){ _ozClicarPoste(p, m); });
       st.posteMarkers[p.id]=m;
     });
+    var cli=st.cliente; // {lat,lng} p/ calcular distância da caixa até o cliente
+    var nImpl=0;
     st.caixas.forEach(function(cx){
       if(!cx.coords) return;
+      var impl=cx.implantada!==false;              // implantada = caixa real de campo
+      if(impl) nImpl++;
       var isCTO=(cx.tipo||'').toUpperCase().indexOf('CTO')===0;
-      var m=L.circleMarker([cx.coords[1],cx.coords[0]],{radius:9,color:isCTO?'#00c4ff':'#b060ff',weight:2,fillColor:isCTO?'#00c4ff':'#b060ff',fillOpacity:.6,bubblingMouseEvents:false});
-      m.addTo(st.layerBase); m.bindTooltip(cx.nome+' ('+(cx.tipo||'')+')');
+      // implantada → cor forte (CTO azul / outras roxo); PLANEJADA → laranja apagado e menor
+      var cor = !impl ? '#f59e0b' : (isCTO?'#00c4ff':'#b060ff');
+      var m=L.circleMarker([cx.coords[1],cx.coords[0]],{radius:impl?9:7,color:cor,weight:2,fillColor:cor,fillOpacity:impl?.7:.35,bubblingMouseEvents:false});
+      m._ozR=impl?9:7;
+      m.addTo(st.layerBase);
+      var dist = cli ? ' · '+_ozDist(cli.lat,cli.lng,cx.coords[1],cx.coords[0])+'m' : '';
+      var tag = impl ? '' : ' ⚠planejada';
+      // rótulo fixo só nas IMPLANTADAS (as reais) p/ não poluir; planejadas só no hover
+      if (impl) m.bindTooltip(cx.nome+dist, {permanent:true, direction:'top', offset:[0,-8], className:'oz-cto-lbl'});
+      else      m.bindTooltip(cx.nome+' ('+(cx.tipo||'')+')'+tag+dist);
       m.on('click', function(){ _ozSelecionarCTO(cx, m); });
+      st.caixaMarkers[cx.id]=m;
     });
     _ozRecolorPostes(); // mantém verdes os postes que já estão na rota
-    var info=document.getElementById('ozmap-mapa-info'); if(info) info.textContent=(st.caixas.length)+' caixas · '+(st.postes.length)+' postes';
+    var info=document.getElementById('ozmap-mapa-info'); if(info) info.textContent=nImpl+' CTOs reais · '+(st.caixas.length-nImpl)+' planejadas · '+(st.postes.length)+' postes';
     _ozStatus(st.statusBase || '1) CTO  2) postes  3) casa do cliente');
     setTimeout(function(){ try{map.invalidateSize();}catch(e){} },150);
   } catch(e){ _ozStatus('❌ '+(e.message||'erro')); }
@@ -2477,6 +2500,7 @@ window.abrirMapaOZmap = async function(login_id, login){
     modal.id='ozmap-mapa-modal';
     modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:400;display:flex;flex-direction:column';
     modal.innerHTML=''
+      +'<style>.oz-cto-lbl{background:rgba(0,0,0,.72);color:#fff;border:1px solid #00c4ff;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700;box-shadow:none}.oz-cto-lbl:before{display:none}</style>'
       +'<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--b)">'
       +'  <strong style="font-family:var(--font-head);color:var(--acc);flex:1">🗺️ Mapear no OZmap</strong>'
       +'  <span id="ozmap-mapa-info" style="font-size:11px;color:var(--tx2)"></span>'
@@ -2484,6 +2508,7 @@ window.abrirMapaOZmap = async function(login_id, login){
       +'</div>'
       +'<div id="ozmap-mapa-canvas" style="flex:1;min-height:0"></div>'
       +'<div style="padding:8px 12px;background:var(--bg2);border-top:1px solid var(--b);display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+      +'  <input id="ozmap-mapa-busca" placeholder="🔎 CTO (ex: 637)" style="width:120px;padding:5px 8px;font-size:12px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx)">'
       +'  <span id="ozmap-mapa-status" style="flex:1;min-width:140px;font-size:11px;color:var(--tx2)">Carregando...</span>'
       +'  <button class="btn-sm btn-gray" id="ozmap-mapa-recarregar" title="Recarregar CTOs/postes na área que está vendo">↻ CTOs aqui</button>'
       +'  <button class="btn-sm btn-gray" id="ozmap-mapa-desfazer">↶ Desfazer</button>'
@@ -2496,6 +2521,8 @@ window.abrirMapaOZmap = async function(login_id, login){
     modal.querySelector('#ozmap-mapa-limpar').onclick=_ozLimpar;
     modal.querySelector('#ozmap-mapa-salvar').onclick=_ozSalvarPreview;
     modal.querySelector('#ozmap-mapa-recarregar').onclick=function(){ var st=_ozEstado; if(st&&st.map){ var c=st.map.getCenter(); _ozCarregarArea(c.lat,c.lng); } };
+    var busca=modal.querySelector('#ozmap-mapa-busca');
+    if(busca){ busca.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); _ozBuscarCTO(busca.value); } }); busca.addEventListener('change',function(){ _ozBuscarCTO(busca.value); }); }
   }
   modal.style.display='flex';
   _ozStatus('Carregando mapa...');
@@ -2514,8 +2541,11 @@ window.abrirMapaOZmap = async function(login_id, login){
 
   var canvas=modal.querySelector('#ozmap-mapa-canvas'); canvas.innerHTML='';
   var map=L.map(canvas).setView(center,18);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'}).addTo(map);
-  _ozEstado={ login_id:login_id, login:login, map:map, caixas:[], postes:[], posteMarkers:{}, layerBase:null, statusBase:'', ctoSel:null, _ctoMarker:null, rota:[], cliente:null, polyline:null, clienteMarker:null };
+  // Satélite por padrão (igual ao OZmap) + toggle p/ Ruas
+  var satt=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:21,attribution:'© Esri'}).addTo(map);
+  var ruas=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'});
+  L.control.layers({'Satélite':satt,'Ruas':ruas},null,{position:'topright'}).addTo(map);
+  _ozEstado={ login_id:login_id, login:login, map:map, caixas:[], postes:[], posteMarkers:{}, caixaMarkers:{}, layerBase:null, statusBase:'', ctoSel:null, _ctoMarker:null, rota:[], cliente:null, polyline:null, clienteMarker:null };
   // Clique em espaço vazio = marca/move a casa do cliente
   map.on('click', function(e){ _ozSetCliente(e.latlng); });
   // Corrige "clique deslocado" (mobile): recalcula o tamanho do mapa após o layout fechar
