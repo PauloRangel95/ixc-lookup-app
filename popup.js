@@ -2392,6 +2392,14 @@ function _ozSalvarPreview(){
   if (!st.ctoSel){ toast('Selecione a CTO de origem (clique numa bolinha azul)','err'); return; }
   if (!st.cliente){ toast('Marque a casa do cliente (clique no mapa)','err'); return; }
   var drop_poles = st.rota.map(function(p){return p.id;});
+  // ONU/conexão que o PWA já buscou (IXC + OLT Cloud) p/ preencher no OZmap
+  var oltc = (dadosAtual && dadosAtual._olt_cloud && dadosAtual._olt_cloud[st.login_id]) || {};
+  var loginObj = (dadosAtual && dadosAtual.logins ? dadosAtual.logins : []).find(function(x){ return String(x.id)===String(st.login_id); }) || {};
+  var onu = {
+    pppoe:  loginObj.login || st.login || null,
+    serial: oltc.serial || null,
+    mac:    loginObj.onu_mac || null
+  };
   var payload = {
     acao:'criar',
     login_id:String(st.login_id),
@@ -2400,7 +2408,9 @@ function _ozSalvarPreview(){
     box: st.ctoSel.id,
     coords:[st.cliente.lng, st.cliente.lat],
     auto_connect:true,
-    drop_poles: drop_poles
+    drop_poles: drop_poles,
+    certificar: true,                 // estado de implantação → Certificado
+    onu: onu                          // preenche ONU (PPPoE/serial/MAC) no OZmap
   };
   console.log('[OZmap criar payload]', payload);
   var podeGravar = true; // liberado geral — cria para qualquer login não mapeado
@@ -2412,7 +2422,9 @@ function _ozSalvarPreview(){
     +'CTO: <strong>'+st.ctoSel.nome+'</strong><br>'
     +'Postes no caminho: <strong>'+drop_poles.length+'</strong><br>'
     +'Cliente (code): <strong>'+st.login_id+'</strong><br>'
-    +'Coords: <strong>'+st.cliente.lat.toFixed(6)+', '+st.cliente.lng.toFixed(6)+'</strong>'
+    +'Coords: <strong>'+st.cliente.lat.toFixed(6)+', '+st.cliente.lng.toFixed(6)+'</strong><br>'
+    +'ONU: <strong>'+([onu.pppoe,onu.serial,onu.mac].filter(Boolean).join(' · ')||'—')+'</strong><br>'
+    +'Estado: <strong>Certificado</strong>'
     +'</div>'
     +'<div style="font-size:10px;color:var(--y);margin:12px 0">⚠ Ao confirmar, <strong>CRIA de verdade</strong> no OZmap. Dá pra desfazer logo em seguida.</div>'
     +'<div id="oz-prev-msg" style="font-size:11px;margin:4px 0;min-height:14px"></div>'

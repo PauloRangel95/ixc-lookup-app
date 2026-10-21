@@ -123,6 +123,25 @@ try {
   }
 
   const pid = criado && (criado.id || criado._id);
+
+  // ── Preenche o ftth-client: estado "Certificado" + dados da ONU ──
+  // Descobre o id do ftth-client (o create já criou/vinculou pelo code).
+  let cliId = criado && criado.client && (criado.client.id || criado.client._id || criado.client);
+  if (!cliId && pid) { const imv = await ozById.call(this,token,'properties',pid); cliId = imv && imv.client && (imv.client.id || imv.client._id || imv.client); }
+  const onuIn = body.onu || {};
+  const patchCli = {};
+  if (body.certificar !== false) { patchCli.implanted = true; patchCli.certified = true; } // estado → Certificado
+  const onuObj = {};
+  if (onuIn.pppoe)  onuObj.user_PPPoE    = String(onuIn.pppoe);
+  if (onuIn.serial) onuObj.serial_number = String(onuIn.serial);
+  if (onuIn.mac)    onuObj.mac_address   = String(onuIn.mac).replace(/[^0-9a-fA-F]/g,'').toUpperCase();
+  if (Object.keys(onuObj).length) patchCli.onu = onuObj;
+  let cli_atualizado = false, cli_erro = null;
+  if (cliId && Object.keys(patchCli).length) {
+    try { await ozReq.call(this,token,'PATCH',`ftth-clients/${cliId}`, patchCli); cli_atualizado = true; }
+    catch(e) { cli_erro = errInfo(e); }
+  }
+
   // Criou SEM porta (CTO cheia no sistema) → registra pendência pro O&M limpar e liberar a porta.
   let pendencia = false;
   if (!conectado && pid) {
@@ -132,7 +151,7 @@ try {
       criado_por: (body.criado_por || null), status: 'pendente'
     });
   }
-  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, pendencia, caixa:(boxObj.name||null), project, raw:criado } }];
+  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, pendencia, caixa:(boxObj.name||null), project, ftth_client:cliId||null, cli_atualizado, cli_erro, raw:criado } }];
 
 } catch(e) {
   return [{ json:{ ok:false, erro:'OZmap: ' + (e.message||String(e)) } }];
