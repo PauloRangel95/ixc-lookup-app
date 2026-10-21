@@ -88,7 +88,11 @@ try {
 
   let criado;
   try { criado = await ozReq.call(this,token,'POST','properties',payload); }
-  catch(e) { return [{ json:{ ok:false, erro:'OZmap [criar]: ' + errInfo(e), payload_enviado: payload } }]; }
+  catch(e) {
+    let dbg='';
+    try { dbg = JSON.stringify(e, Object.getOwnPropertyNames(e)).slice(0,1800); } catch(_) { dbg='(nao serializavel)'; }
+    return [{ json:{ ok:false, erro:'OZmap [criar]: ' + errInfo(e), payload_enviado: payload, erro_debug: dbg } }];
+  }
 
   const pid = criado && (criado.id || criado._id);
   const depois = pid ? await ozById.call(this,token,'properties',pid) : null;
