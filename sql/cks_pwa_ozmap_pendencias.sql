@@ -23,3 +23,8 @@ create table if not exists public.cks_pwa_ozmap_pendencias (
 
 create index if not exists idx_cks_pwa_ozmap_pend_status
   on public.cks_pwa_ozmap_pendencias (status, criado_em desc);
+
+-- Permissões para a API (PostgREST) — sem isso dá "permission denied" (42501) ao ler/atualizar.
+-- Mesmo padrão das outras tabelas (ixc_logs etc.).
+grant select, insert, update, delete on public.cks_pwa_ozmap_pendencias
+  to anon, authenticated, service_role;
