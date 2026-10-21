@@ -1,0 +1,76 @@
+{
+  "name": "ixc-ozmap-debug",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ixc-ozmap-debug",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-dbg",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "ixc-ozmap-debug"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ixc-ozmap-debug — LEITURA crua p/ inspeção (descobrir como o OZmap guarda OLT/Slot/PON).\n// Entrada: { login_id }  (= code do ftth-client). Rode num cliente REAL que já tem a conexão preenchida.\n// Devolve os objetos CRUS (ftth-client, property, box) + lista de OLTs do OZmap.\nconst OZ_BASE   = 'https://carajasnet.ozmap.com.br:9994';\nconst OZ_CLIENT = 'COLE_O_clientId_DO_CKS';\nconst OZ_SECRET = 'COLE_O_clientSecret_DO_CKS';\n\nconst BASE = String(OZ_BASE).replace(/\\/+$/,'').replace(/\\/api\\/v2$/i,'');\nconst body = $input.first().json.body || $input.first().json;\nconst loginId = String(body.login_id || body.code || '').trim();\nif (!loginId) return [{ json:{ ok:false, erro:'informe login_id (code do cliente)' } }];\n\nfunction errInfo(e){ const c=e.httpCode||e.statusCode||(e.response&&e.response.statusCode)||''; let d=''; try{const b=e.response&&e.response.body; if(b) d=typeof b==='string'?b:JSON.stringify(b);}catch(_){} return (c?'HTTP '+c+' ':'')+(e.message||'')+(d?' :: '+String(d).slice(0,400):''); }\nlet AUTHPFX='';\nasync function ozToken(){ const r=await this.helpers.httpRequest({method:'POST',url:`${BASE}/api/v2/auth/token`,headers:{'Content-Type':'application/json'},body:{clientId:OZ_CLIENT,clientSecret:OZ_SECRET},json:true}); if(!r||!r.accessToken) throw new Error('sem accessToken'); return r.accessToken; }\nasync function ozGet(token,pathq,bodyObj){ const self=this; const doReq=(pfx)=>self.helpers.httpRequest({method:'GET',url:`${BASE}/api/v2/${pathq}`,headers:{'Authorization':pfx+token,'Content-Type':'application/json'},body:bodyObj||undefined,json:true}); try{return await doReq(AUTHPFX);}catch(e){const c=e.httpCode||e.statusCode||(e.response&&e.response.statusCode); if(c===401&&AUTHPFX===''){AUTHPFX='Bearer ';return await doReq(AUTHPFX);} throw e;} }\nasync function ozList(token,rota,filtro,limit){ try{ let q=`page=1&limit=${limit||1}`; if(filtro) q+='&filter='+encodeURIComponent(JSON.stringify(filtro)); const r=await ozGet.call(this,token,`${rota}?${q}`,filtro?{filter:filtro}:undefined); return (r&&Array.isArray(r.rows))?r.rows:[]; }catch(e){ throw new Error('['+rota+'] '+errInfo(e)); } }\nasync function ozById(token,rota,id){ if(!id) return null; try{ return await ozGet.call(this,token,`${rota}/${id}`); }catch(e){ return null; } }\n\ntry {\n  const token = await ozToken.call(this);\n  const rows = await ozList.call(this,token,'ftth-clients',[{property:'code',operator:'=',value:loginId}],1);\n  const cli = rows[0];\n  if (!cli) return [{ json:{ ok:true, encontrado:false, motivo:'cliente não achado pelo code '+loginId } }];\n  const cliId = cli.id||cli._id;\n  const imoveis = await ozList.call(this,token,'properties',[{property:'client',operator:'=',value:cliId}],1);\n  const imv = imoveis[0] || null;\n  const box = imv && imv.box ? await ozById.call(this,token,'boxes',imv.box) : null;\n  // Tenta listar OLTs do OZmap (o nome do endpoint pode variar) — só pra ver o inventário.\n  let olts=null, olts_rota=null;\n  for (const rota of ['olts','equipments','ceos','pop-connections']) {\n    try { const r = await ozList.call(this,token,rota,null,5); if (Array.isArray(r)) { olts=r; olts_rota=rota; break; } } catch(e){}\n  }\n  return [{ json:{\n    ok:true, encontrado:true, login_id:loginId,\n    RAW_ftth_client: cli,\n    RAW_property: imv,\n    RAW_box: box,\n    OLTs_amostra: olts, OLTs_rota: olts_rota\n  } }];\n} catch(e) {\n  return [{ json:{ ok:false, erro:'OZmap debug: '+(e.message||String(e)) } }];\n}\n"
+      },
+      "id": "code-dbg",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "id": "resp-dbg",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        800,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
