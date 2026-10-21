@@ -2423,7 +2423,8 @@ function _ozSalvarPreview(){
       var r=await fetch(WEBHOOK_OZMAP_CRIAR,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(x){return x.json();});
       if (!r || !r.ok){ msg.style.color='var(--r)'; msg.textContent='❌ '+((r&&r.erro)||'Falha ao criar'); btnCriar.disabled=false; btnCriar.textContent='✅ Criar no OZmap'; return; }
       var pid=r.property_id;
-      msg.style.color='var(--g)'; msg.textContent='✅ Criado! id: '+(pid||'—')+(r.conferido?' (conferido)':'');
+      if (r.conectado===false){ msg.style.color='var(--y)'; msg.textContent='✅ Criado, mas SEM porta (CTO sem porta livre) — conecte manualmente no OZmap · id: '+(pid||'—'); }
+      else { msg.style.color='var(--g)'; msg.textContent='✅ Criado e conectado na porta · id: '+(pid||'—'); }
       var btns=ov.querySelector('#oz-prev-btns');
       btns.innerHTML='<button class="btn-sm btn-gray" id="oz-prev-fechar2">Fechar</button>'+(pid?'<button class="btn-sm btn-red" id="oz-prev-undo">↩ Desfazer (apagar)</button>':'');
       ov.querySelector('#oz-prev-fechar2').onclick=function(){ fechar(); fecharMapaOZmap(); if(dadosAtual&&dadosAtual.logins) buscarOZmap(dadosAtual.logins).catch(function(){}); };

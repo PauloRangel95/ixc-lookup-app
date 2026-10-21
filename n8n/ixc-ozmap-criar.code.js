@@ -77,27 +77,30 @@ try {
   const project = (boxObj.project && (boxObj.project.id || boxObj.project)) || null;
   if (!project) return [{ json:{ ok:false, erro:'CTO sem project no OZmap' } }];
 
-  const payload = {
-    kind: 'property',
+  // OBS: NÃO mandar 'kind' (o OZmap recusa). project vem da CTO.
+  const base = {
     client: { code: String(client.code), name: client.name || String(client.code) },
-    box, project, coords,
-    auto_connect: body.auto_connect !== false,
-    drop_poles
+    box, project, coords, drop_poles
   };
-  if (body.port != null && body.port !== '') payload.port = Number(body.port);
+  if (body.port != null && body.port !== '') base.port = Number(body.port);
 
-  let criado;
-  try { criado = await ozReq.call(this,token,'POST','properties',payload); }
-  catch(e) {
-    let dbg='';
-    try { dbg = JSON.stringify(e, Object.getOwnPropertyNames(e)).slice(0,1800); } catch(_) { dbg='(nao serializavel)'; }
-    return [{ json:{ ok:false, erro:'OZmap [criar]: ' + errInfo(e), payload_enviado: payload, erro_debug: dbg } }];
+  // 1) tenta conectar automaticamente numa porta livre da CTO;
+  // 2) se a CTO não tiver conector/porta PON livre, cria SEM conectar (conectado:false).
+  let criado, conectado = true;
+  try {
+    criado = await ozReq.call(this,token,'POST','properties', Object.assign({}, base, { auto_connect:true }));
+  } catch(e) {
+    const msg = errInfo(e);
+    if (/conector|\bPON\b|porta/i.test(msg)) {
+      try { criado = await ozReq.call(this,token,'POST','properties', Object.assign({}, base, { auto_connect:false })); conectado = false; }
+      catch(e2) { return [{ json:{ ok:false, erro:'OZmap [criar]: ' + errInfo(e2), payload_enviado: base } }]; }
+    } else {
+      return [{ json:{ ok:false, erro:'OZmap [criar]: ' + msg, payload_enviado: base } }];
+    }
   }
 
   const pid = criado && (criado.id || criado._id);
-  const depois = pid ? await ozById.call(this,token,'properties',pid) : null;
-  return [{ json:{ ok:true, acao:'criar', property_id:pid, caixa:(boxObj.name||null), project,
-    conferido: !!depois, raw:criado } }];
+  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, caixa:(boxObj.name||null), project, raw:criado } }];
 
 } catch(e) {
   return [{ json:{ ok:false, erro:'OZmap: ' + (e.message||String(e)) } }];
