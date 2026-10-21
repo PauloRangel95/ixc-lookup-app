@@ -110,10 +110,11 @@ try {
 
   // 1) tenta conectar automaticamente numa porta livre da CTO;
   // 2) QUALQUER falha ao conectar → cria SEM conectar (auto_connect:false funciona sempre).
-  let criado, conectado = true;
+  let criado, conectado = true, erro_autoconnect = null;
   try {
     criado = await ozReq.call(this,token,'POST','properties', Object.assign({}, base, { auto_connect:true }));
   } catch(e) {
+    erro_autoconnect = errInfo(e);   // POR QUE o auto_connect falhou (ex.: sem porta livre vs outro erro)
     try {
       criado = await ozReq.call(this,token,'POST','properties', Object.assign({}, base, { auto_connect:false }));
       conectado = false;
@@ -162,7 +163,7 @@ try {
       criado_por: (body.criado_por || null), status: 'pendente'
     });
   }
-  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, pendencia, caixa:(boxObj.name||null), project, ftth_client:cliId||null, cli_atualizado, cli_erro, prop_atualizado, prop_erro, raw:criado } }];
+  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, erro_autoconnect, pendencia, caixa:(boxObj.name||null), project, ftth_client:cliId||null, cli_atualizado, cli_erro, prop_atualizado, prop_erro, raw:criado } }];
 
 } catch(e) {
   return [{ json:{ ok:false, erro:'OZmap: ' + (e.message||String(e)) } }];
