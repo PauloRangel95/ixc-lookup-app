@@ -106,8 +106,7 @@ try {
     box, project, coords, drop_poles
   };
   if (body.port != null && body.port !== '') base.port = Number(body.port);
-  if (body.endereco) base.address = String(body.endereco);   // endereço do imóvel (vem do IXC)
-  if (body.potencia != null && body.potencia !== '' && isFinite(Number(body.potencia))) base.potencyRead = Number(body.potencia); // potência lida (sinal ONU do OLT Cloud)
+  // address/potencyRead NÃO vão na criação (o OZ pode recusar) → PATCH depois do create.
   // OLT/Slot/PON/ONU não tem campo nativo no OZ → grava como observação (vem do OLT Cloud)
   const cx = body.conexao || {};
   const obsPartes = [];
@@ -133,6 +132,16 @@ try {
   }
 
   const pid = criado && (criado.id || criado._id);
+
+  // ── Enriquece o IMÓVEL (pós-create, tolerante a falha): endereço + potência lida ──
+  const propPatch = {};
+  if (body.endereco) propPatch.address = String(body.endereco);
+  if (body.potencia != null && body.potencia !== '' && isFinite(Number(body.potencia))) propPatch.potencyRead = Number(body.potencia);
+  let prop_atualizado = false, prop_erro = null;
+  if (pid && Object.keys(propPatch).length) {
+    try { await ozReq.call(this,token,'PATCH',`properties/${pid}`, propPatch); prop_atualizado = true; }
+    catch(e) { prop_erro = errInfo(e); }
+  }
 
   // ── Preenche o ftth-client: estado "Certificado" + dados da ONU ──
   // Descobre o id do ftth-client (o create já criou/vinculou pelo code).
@@ -162,7 +171,7 @@ try {
       criado_por: (body.criado_por || null), status: 'pendente'
     });
   }
-  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, pendencia, caixa:(boxObj.name||null), project, ftth_client:cliId||null, cli_atualizado, cli_erro, raw:criado } }];
+  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, pendencia, caixa:(boxObj.name||null), project, ftth_client:cliId||null, cli_atualizado, cli_erro, prop_atualizado, prop_erro, raw:criado } }];
 
 } catch(e) {
   return [{ json:{ ok:false, erro:'OZmap: ' + (e.message||String(e)) } }];
