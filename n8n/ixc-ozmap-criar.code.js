@@ -9,6 +9,10 @@ const OZ_SECRET = 'COLE_O_clientSecret_DO_CKS';
 // Trava de segurança: nesta fase só cria para este login de teste. Troque/limpe quando validar.
 const SOMENTE_LOGIN_TESTE = '9441';
 
+// Supabase (mesma instância do PWA/CKS) — grava a pendência de porta pro OIM revisar/limpar a caixa
+const SUPA_URL = 'https://carajasnet-supabase.bwadmr.easypanel.host';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE';
+
 const BASE = String(OZ_BASE).replace(/\/+$/,'').replace(/\/api\/v2$/i,'');
 const body = $input.first().json.body || $input.first().json;
 const acao = String(body.acao || 'criar');
@@ -44,6 +48,14 @@ async function ozReq(token, method, rota, obj) {
   catch(e) { const code=e.httpCode||e.statusCode||(e.response&&e.response.statusCode); if (code===401 && AUTHPFX===''){ AUTHPFX='Bearer '; return await doReq(AUTHPFX); } throw e; }
 }
 async function ozById(token, rota, id) { if(!id) return null; try { return await ozReq.call(this,token,'GET',`${rota}/${id}`); } catch(e){ return null; } }
+async function supaInsert(tabela, row) {
+  try {
+    await this.helpers.httpRequest({ method:'POST', url:`${SUPA_URL}/rest/v1/${tabela}`,
+      headers:{ apikey:SUPA_KEY, Authorization:'Bearer '+SUPA_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
+      body: row, json:true });
+    return true;
+  } catch(e) { return false; }
+}
 
 try {
   const token = await ozToken.call(this);
@@ -100,7 +112,16 @@ try {
   }
 
   const pid = criado && (criado.id || criado._id);
-  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, caixa:(boxObj.name||null), project, raw:criado } }];
+  // Criou SEM porta (CTO cheia no sistema) → registra pendência pro OIM limpar e liberar a porta.
+  let pendencia = false;
+  if (!conectado && pid) {
+    pendencia = await supaInsert.call(this, 'cks_pwa_ozmap_pendencias', {
+      property_id: pid, login_id: loginId, cliente_nome: (client.name || null),
+      box_id: box, box_nome: (boxObj.name || null), coords: coords,
+      criado_por: (body.criado_por || null), status: 'pendente'
+    });
+  }
+  return [{ json:{ ok:true, acao:'criar', property_id:pid, conectado, pendencia, caixa:(boxObj.name||null), project, raw:criado } }];
 
 } catch(e) {
   return [{ json:{ ok:false, erro:'OZmap: ' + (e.message||String(e)) } }];
