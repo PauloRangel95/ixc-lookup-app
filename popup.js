@@ -2400,6 +2400,9 @@ function _ozSalvarPreview(){
     serial: oltc.serial || null,
     mac:    loginObj.onu_mac || null
   };
+  // OLT/Slot/PON/ONU vira observação no OZ (não tem campo nativo); potência vira potencyRead
+  var conexao = { olt: oltc.olt||null, slot: oltc.slot||null, pon: oltc.pon||null, onu_id: oltc.slot_pon_onu||null };
+  var potencia = (oltc.sinal_onu!=null ? oltc.sinal_onu : null);
   var payload = {
     acao:'criar',
     login_id:String(st.login_id),
@@ -2411,6 +2414,8 @@ function _ozSalvarPreview(){
     drop_poles: drop_poles,
     certificar: true,                 // estado de implantação → Certificado
     onu: onu,                         // preenche ONU (PPPoE/serial/MAC) no OZmap
+    conexao: conexao,                 // OLT/Slot/PON/ONU → observação no OZ
+    potencia: potencia,               // sinal da ONU → potencyRead
     endereco: (dadosAtual && ((dadosAtual.contrato && dadosAtual.contrato.endereco) || (dadosAtual.cliente && dadosAtual.cliente.endereco))) || null,
     cep:      (dadosAtual && dadosAtual.cliente && dadosAtual.cliente.cep) || null
   };
@@ -2427,6 +2432,8 @@ function _ozSalvarPreview(){
     +'Coords: <strong>'+st.cliente.lat.toFixed(6)+', '+st.cliente.lng.toFixed(6)+'</strong><br>'
     +'ONU: <strong>'+([onu.pppoe,onu.serial,onu.mac].filter(Boolean).join(' · ')||'—')+'</strong><br>'
     +'Endereço: <strong>'+((payload.endereco||'—'))+'</strong><br>'
+    +'Conexão: <strong>'+([conexao.olt, conexao.slot!=null?'Slot '+conexao.slot:null, conexao.pon!=null?'PON '+conexao.pon:null, conexao.onu_id?'ONU '+conexao.onu_id:null].filter(Boolean).join(' · ')||'—')+'</strong><br>'
+    +'Potência: <strong>'+(potencia!=null?potencia+' dBm':'—')+'</strong><br>'
     +'Estado: <strong>Certificado</strong>'
     +'</div>'
     +'<div style="font-size:10px;color:var(--y);margin:12px 0">⚠ Ao confirmar, <strong>CRIA de verdade</strong> no OZmap. Dá pra desfazer logo em seguida.</div>'

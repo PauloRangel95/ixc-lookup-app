@@ -107,6 +107,15 @@ try {
   };
   if (body.port != null && body.port !== '') base.port = Number(body.port);
   if (body.endereco) base.address = String(body.endereco);   // endereço do imóvel (vem do IXC)
+  if (body.potencia != null && body.potencia !== '' && isFinite(Number(body.potencia))) base.potencyRead = Number(body.potencia); // potência lida (sinal ONU do OLT Cloud)
+  // OLT/Slot/PON/ONU não tem campo nativo no OZ → grava como observação (vem do OLT Cloud)
+  const cx = body.conexao || {};
+  const obsPartes = [];
+  if (cx.olt)          obsPartes.push('OLT: ' + cx.olt);
+  if (cx.slot  != null && cx.slot  !== '') obsPartes.push('Slot ' + cx.slot);
+  if (cx.pon   != null && cx.pon   !== '') obsPartes.push('PON ' + cx.pon);
+  if (cx.onu_id)       obsPartes.push('ONU ' + cx.onu_id);
+  const obsConexao = obsPartes.length ? ('Conexão (OLT Cloud) — ' + obsPartes.join(' · ')) : '';
 
   // 1) tenta conectar automaticamente numa porta livre da CTO;
   // 2) QUALQUER falha ao conectar → cria SEM conectar (auto_connect:false funciona sempre).
@@ -132,6 +141,7 @@ try {
   const onuIn = body.onu || {};
   const patchCli = {};
   if (body.certificar !== false) { patchCli.implanted = true; patchCli.certified = true; } // estado → Certificado
+  if (obsConexao) patchCli.observation = obsConexao;   // OLT/Slot/PON/ONU nas Observações do cliente
   const onuObj = {};
   if (onuIn.pppoe)  onuObj.user_PPPoE    = String(onuIn.pppoe);
   if (onuIn.serial) onuObj.serial_number = String(onuIn.serial);
