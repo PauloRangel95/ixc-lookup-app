@@ -106,6 +106,7 @@ try {
     box, project, coords, drop_poles
   };
   if (body.port != null && body.port !== '') base.port = Number(body.port);
+  if (body.endereco) base.address = String(body.endereco);   // endereço do imóvel (vem do IXC)
 
   // 1) tenta conectar automaticamente numa porta livre da CTO;
   // 2) QUALQUER falha ao conectar → cria SEM conectar (auto_connect:false funciona sempre).
