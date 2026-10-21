@@ -1,5 +1,5 @@
 // ixc-ozmap-conectar — conecta um imóvel existente numa PORTA do splitter da CTO e resolve a pendência.
-// Chamado pelo CKS quando o OIM confirma a porta liberada.
+// Chamado pelo CKS quando o O&M confirma a porta liberada.
 // Entrada: { property_id, port, resolvido_por? }
 const OZ_BASE   = 'https://carajasnet.ozmap.com.br:9994';
 const OZ_CLIENT = 'COLE_O_clientId_DO_CKS';

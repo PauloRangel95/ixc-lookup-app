@@ -1,7 +1,7 @@
 -- Tabela COMPARTILHADA (CKS + PWA): fila de pendências de porta no OZmap.
 -- Fluxo: o técnico cria um cliente no OZmap pelo PWA; se a CTO não tem porta livre
 -- no sistema (mas está ligada no físico), o imóvel é criado SEM porta e cai aqui.
--- O OIM (no CKS) revisa a caixa, faz a limpeza/libera a porta e confirma qual porta
+-- O O&M (no CKS) revisa a caixa, faz a limpeza/libera a porta e confirma qual porta
 -- → o sistema conecta o imóvel nessa porta e marca a pendência como resolvida.
 
 create table if not exists public.cks_pwa_ozmap_pendencias (
@@ -15,8 +15,8 @@ create table if not exists public.cks_pwa_ozmap_pendencias (
   criado_por       text,                     -- técnico que criou (nome/login)
   criado_em        timestamptz default now(),
   status           text default 'pendente',  -- pendente | resolvida | cancelada
-  porta_confirmada int,                      -- porta que o OIM liberou/confirmou
-  resolvido_por    text,                     -- OIM que resolveu
+  porta_confirmada int,                      -- porta que o O&M liberou/confirmou
+  resolvido_por    text,                     -- O&M que resolveu
   resolvido_em     timestamptz,
   obs              text
 );

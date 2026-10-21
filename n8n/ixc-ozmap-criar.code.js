@@ -9,7 +9,7 @@ const OZ_SECRET = 'COLE_O_clientSecret_DO_CKS';
 // Trava de segurança: nesta fase só cria para este login de teste. Troque/limpe quando validar.
 const SOMENTE_LOGIN_TESTE = '9441';
 
-// Supabase (mesma instância do PWA/CKS) — grava a pendência de porta pro OIM revisar/limpar a caixa
+// Supabase (mesma instância do PWA/CKS) — grava a pendência de porta pro O&M revisar/limpar a caixa
 const SUPA_URL = 'https://carajasnet-supabase.bwadmr.easypanel.host';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE';
 
@@ -56,6 +56,14 @@ async function supaInsert(tabela, row) {
     return true;
   } catch(e) { return false; }
 }
+async function supaPatch(tabela, filtro, patch) {
+  try {
+    await this.helpers.httpRequest({ method:'PATCH', url:`${SUPA_URL}/rest/v1/${tabela}?${filtro}`,
+      headers:{ apikey:SUPA_KEY, Authorization:'Bearer '+SUPA_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
+      body: patch, json:true });
+    return true;
+  } catch(e) { return false; }
+}
 
 try {
   const token = await ozToken.call(this);
@@ -65,9 +73,12 @@ try {
     const pid = String(body.property_id || '').trim();
     if (!pid) return [{ json:{ ok:false, erro:'property_id é obrigatório' } }];
     const antes = await ozById.call(this,token,'properties',pid);
-    if (!antes) return [{ json:{ ok:false, erro:'imóvel não encontrado (já apagado?)' } }];
-    await ozReq.call(this,token,'DELETE',`properties/${pid}`);
-    return [{ json:{ ok:true, acao:'apagar', apagado:pid } }];
+    if (antes) { await ozReq.call(this,token,'DELETE',`properties/${pid}`); }
+    // cancela a pendência (se houver) pra não deixar linha órfã na fila do O&M
+    await supaPatch.call(this, 'cks_pwa_ozmap_pendencias',
+      `property_id=eq.${encodeURIComponent(pid)}&status=eq.pendente`,
+      { status:'cancelada', resolvido_em:new Date().toISOString() });
+    return [{ json:{ ok:true, acao:'apagar', apagado:pid, ja_apagado: !antes } }];
   }
 
   // ── CRIAR ──
@@ -112,7 +123,7 @@ try {
   }
 
   const pid = criado && (criado.id || criado._id);
-  // Criou SEM porta (CTO cheia no sistema) → registra pendência pro OIM limpar e liberar a porta.
+  // Criou SEM porta (CTO cheia no sistema) → registra pendência pro O&M limpar e liberar a porta.
   let pendencia = false;
   if (!conectado && pid) {
     pendencia = await supaInsert.call(this, 'cks_pwa_ozmap_pendencias', {
