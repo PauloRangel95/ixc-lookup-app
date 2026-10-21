@@ -6,8 +6,8 @@ const OZ_BASE   = 'https://carajasnet.ozmap.com.br:9994';
 const OZ_CLIENT = 'COLE_O_clientId_DO_CKS';
 const OZ_SECRET = 'COLE_O_clientSecret_DO_CKS';
 
-// Trava de segurança: nesta fase só cria para este login de teste. Troque/limpe quando validar.
-const SOMENTE_LOGIN_TESTE = '9441';
+// Trava de segurança por login (vazio = liberado geral). Preencha com um login p/ restringir a teste.
+const SOMENTE_LOGIN_TESTE = '';
 
 // Supabase (mesma instância do PWA/CKS) — grava a pendência de porta pro O&M revisar/limpar a caixa
 const SUPA_URL = 'https://carajasnet-supabase.bwadmr.easypanel.host';

@@ -2393,7 +2393,7 @@ function _ozSalvarPreview(){
     drop_poles: drop_poles
   };
   console.log('[OZmap criar payload]', payload);
-  var podeGravar = String(st.login_id) === OZMAP_CRIAR_LOGIN_TESTE;
+  var podeGravar = true; // liberado geral — cria para qualquer login não mapeado
   var ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:16px';
   ov.innerHTML='<div style="background:var(--bg2);border:1px solid var(--b2);border-radius:10px;padding:18px;max-width:380px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.6)">'
@@ -2404,9 +2404,7 @@ function _ozSalvarPreview(){
     +'Cliente (code): <strong>'+st.login_id+'</strong><br>'
     +'Coords: <strong>'+st.cliente.lat.toFixed(6)+', '+st.cliente.lng.toFixed(6)+'</strong>'
     +'</div>'
-    +(podeGravar
-      ? '<div style="font-size:10px;color:var(--y);margin:12px 0">⚠ Ao confirmar, <strong>CRIA de verdade</strong> no OZmap (login de teste '+OZMAP_CRIAR_LOGIN_TESTE+'). Dá pra desfazer logo em seguida.</div>'
-      : '<div style="font-size:10px;color:var(--tx3);margin:12px 0">Nesta fase a criação está liberada só para o login de teste '+OZMAP_CRIAR_LOGIN_TESTE+'. Aqui é só revisão.</div>')
+    +'<div style="font-size:10px;color:var(--y);margin:12px 0">⚠ Ao confirmar, <strong>CRIA de verdade</strong> no OZmap. Dá pra desfazer logo em seguida.</div>'
     +'<div id="oz-prev-msg" style="font-size:11px;margin:4px 0;min-height:14px"></div>'
     +'<div style="display:flex;gap:8px;justify-content:flex-end" id="oz-prev-btns">'
     +'<button class="btn-sm btn-gray" id="oz-prev-fechar">Fechar</button>'
