@@ -14,11 +14,18 @@ const body = $input.first().json.body || $input.first().json;
 const acao = String(body.acao || 'criar');
 
 function errInfo(e) {
-  const code = e.httpCode || e.statusCode || (e.response && e.response.statusCode) || '';
+  const r = e.response || {};
+  const code = e.httpCode || e.statusCode || r.statusCode || r.status || '';
   let detail = '';
-  try { const b = e.response && e.response.body; if (b) detail = typeof b === 'string' ? b : JSON.stringify(b); } catch(_) {}
+  try {
+    let b = (r.body !== undefined) ? r.body
+          : (r.data !== undefined) ? r.data
+          : (e.cause && e.cause.response && e.cause.response.data);
+    if (b === undefined && e.context && e.context.data !== undefined) b = e.context.data;
+    if (b !== undefined && b !== null) detail = (typeof b === 'string') ? b : JSON.stringify(b);
+  } catch(_) {}
   if (!detail && e.description) detail = (typeof e.description === 'string') ? e.description : JSON.stringify(e.description);
-  return (code ? 'HTTP ' + code + ' ' : '') + (e.message || '') + (detail ? ' :: ' + String(detail).slice(0,400) : '');
+  return (code ? 'HTTP ' + code + ' ' : '') + (e.message || '') + (detail ? ' :: ' + String(detail).slice(0,600) : '');
 }
 let AUTHPFX = '';
 async function ozToken() {
