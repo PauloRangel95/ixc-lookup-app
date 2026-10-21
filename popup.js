@@ -2322,7 +2322,7 @@ function _ozCoordStr(s){ if(!s) return null; var m=String(s).match(/(-?\d{1,2}\.
 function _ozDist(aLat,aLng,bLat,bLng){ var R=6371000,dLat=(bLat-aLat)*Math.PI/180,dLng=(bLng-aLng)*Math.PI/180,s1=Math.sin(dLat/2),s2=Math.sin(dLng/2),a=s1*s1+Math.cos(aLat*Math.PI/180)*Math.cos(bLat*Math.PI/180)*s2*s2; return Math.round(2*R*Math.asin(Math.sqrt(a))); }
 function _ozBuscarCTO(term){
   var st=_ozEstado; if(!st||!st.caixas) return; term=(term||'').trim().toUpperCase(); if(!term) return;
-  var hit=st.caixas.filter(function(c){return c.coords;}).find(function(c){ return (c.nome||'').toUpperCase().indexOf(term)>=0; });
+  var hit=st.caixas.filter(function(c){return c.coords && st.caixaMarkers && st.caixaMarkers[c.id];}).find(function(c){ return (c.nome||'').toUpperCase().indexOf(term)>=0; });
   if(!hit){ toast('CTO não encontrada: '+term,'err'); return; }
   try{ st.map.setView([hit.coords[1],hit.coords[0]],19); }catch(e){}
   var mk=st.caixaMarkers&&st.caixaMarkers[hit.id];
@@ -2468,27 +2468,28 @@ async function _ozCarregarArea(lat, lng){
       st.posteMarkers[p.id]=m;
     });
     var cli=st.cliente; // {lat,lng} p/ calcular distância da caixa até o cliente
-    var nImpl=0;
+    var nReal=0, nPad=0;
     st.caixas.forEach(function(cx){
       if(!cx.coords) return;
-      var impl=cx.implantada!==false;              // implantada = caixa real de campo
-      if(impl) nImpl++;
-      var isCTO=(cx.tipo||'').toUpperCase().indexOf('CTO')===0;
-      // implantada → cor forte (CTO azul / outras roxo); PLANEJADA → laranja apagado e menor
+      var tipo=(cx.tipo||'');
+      // Caixa REAL de campo = tipo com splitter (CTO_1x8, CD_1x8...). Tipo "CTO" puro = PADRÃO/template → NÃO existe em campo: oculta.
+      var real=/_/.test(tipo);
+      if(!real){ nPad++; return; }
+      nReal++;
+      var impl=cx.implantada!==false;              // implantada = já ativa; planejada = laranja + aviso
+      var isCTO=tipo.toUpperCase().indexOf('CTO')===0;
       var cor = !impl ? '#f59e0b' : (isCTO?'#00c4ff':'#b060ff');
-      var m=L.circleMarker([cx.coords[1],cx.coords[0]],{radius:impl?9:7,color:cor,weight:2,fillColor:cor,fillOpacity:impl?.7:.35,bubblingMouseEvents:false});
+      var m=L.circleMarker([cx.coords[1],cx.coords[0]],{radius:impl?9:7,color:cor,weight:2,fillColor:cor,fillOpacity:impl?.7:.4,bubblingMouseEvents:false});
       m._ozR=impl?9:7;
       m.addTo(st.layerBase);
       var dist = cli ? ' · '+_ozDist(cli.lat,cli.lng,cx.coords[1],cx.coords[0])+'m' : '';
-      var tag = impl ? '' : ' ⚠planejada';
-      // rótulo fixo só nas IMPLANTADAS (as reais) p/ não poluir; planejadas só no hover
       if (impl) m.bindTooltip(cx.nome+dist, {permanent:true, direction:'top', offset:[0,-8], className:'oz-cto-lbl'});
-      else      m.bindTooltip(cx.nome+' ('+(cx.tipo||'')+')'+tag+dist);
+      else      m.bindTooltip(cx.nome+' ⚠planejada'+dist);
       m.on('click', function(){ _ozSelecionarCTO(cx, m); });
       st.caixaMarkers[cx.id]=m;
     });
     _ozRecolorPostes(); // mantém verdes os postes que já estão na rota
-    var info=document.getElementById('ozmap-mapa-info'); if(info) info.textContent=nImpl+' CTOs reais · '+(st.caixas.length-nImpl)+' planejadas · '+(st.postes.length)+' postes';
+    var info=document.getElementById('ozmap-mapa-info'); if(info) info.textContent=nReal+' CTOs reais · '+(st.postes.length)+' postes'+(nPad?' · '+nPad+' padrão ocultas':'');
     _ozStatus(st.statusBase || '1) CTO  2) postes  3) casa do cliente');
     setTimeout(function(){ try{map.invalidateSize();}catch(e){} },150);
   } catch(e){ _ozStatus('❌ '+(e.message||'erro')); }
@@ -2541,8 +2542,8 @@ window.abrirMapaOZmap = async function(login_id, login){
 
   var canvas=modal.querySelector('#ozmap-mapa-canvas'); canvas.innerHTML='';
   var map=L.map(canvas).setView(center,18);
-  // Satélite por padrão (igual ao OZmap) + toggle p/ Ruas
-  var satt=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:21,attribution:'© Esri'}).addTo(map);
+  // Satélite Google (mesmo do OZmap; lyrs=y = satélite + nomes de rua) + toggle p/ Ruas
+  var satt=L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{maxZoom:21,subdomains:['0','1','2','3'],attribution:'© Google'}).addTo(map);
   var ruas=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:20,attribution:'© OpenStreetMap'});
   L.control.layers({'Satélite':satt,'Ruas':ruas},null,{position:'topright'}).addTo(map);
   _ozEstado={ login_id:login_id, login:login, map:map, caixas:[], postes:[], posteMarkers:{}, caixaMarkers:{}, layerBase:null, statusBase:'', ctoSel:null, _ctoMarker:null, rota:[], cliente:null, polyline:null, clienteMarker:null };
