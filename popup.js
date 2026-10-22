@@ -849,7 +849,7 @@ function infoBox(t,txt,cls){if(!txt)return '';return `<div class="info-box ${cls
 function secT(t){return `<div class="sec-title">${t}</div>`;}
 function fmtOLT(v,dec,unit){if(v==null)return '—';const n=parseFloat(v);if(isNaN(n))return '—';return n.toFixed(dec)+(unit||'');}
 // Faixas de sinal/temperatura — PADRÃO FIXO para todos (somente informativo, sem edição)
-const CFG_SINAL = { verde:-18, amarelo:-20, tempAmarelo:60, tempVermelho:75 };
+const CFG_SINAL = { verde:-20, amarelo:-22, tempAmarelo:60, tempVermelho:75 };
 
 function sinalCls(v){
   const s=parseFloat(v); if(isNaN(s))return 'cinza';
