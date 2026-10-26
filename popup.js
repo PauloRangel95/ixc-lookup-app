@@ -2706,6 +2706,8 @@ async function buscarOLT(logins) {
           olt:d.olt||null, olt_id:d.olt_id||null, slot:d.slot||null, pon:d.pon||null,
           slot_pon_onu:d['slot/pon/onu_id']||null,
           sinal_onu:d.device_rx??null, sinal_olt:d.olt_rx??null,
+          sinal_tx:(d.device_tx??d.tx_power??d.device_tx_power??d.onu_tx??null),
+          catv_rx:(d.catv_rx??d.device_catv_rx??d.optical_module_catv_rx??d.catv??d.catv_power??null),
           temperatura:d.optical_module_temperature??null, tensao:d.optical_module_volt??null,
           corrente:d.optical_module_current??null, distancia:d.optical_module_distance??null,
           ultimo_alarme:d.optical_module_last_alarm||null, uptime:d.optical_module_uptime||null,
@@ -2781,7 +2783,9 @@ async function buscarOLT(logins) {
       oltHtml+=secTCopy('OLT Cloud — Sinal em tempo real','olt-sinal-'+sid)+`<div id="olt-sinal-${sid}">`;
       oltHtml+=`<div class="olt-grid">
         <div class="olt-item ${sinalCls(olt.sinal_onu)}"><div class="olt-label">RX ONU</div><div class="olt-val">${fmtOLT(olt.sinal_onu,2,' dBm')}</div></div>
+        <div class="olt-item cinza"><div class="olt-label">TX ONU</div><div class="olt-val">${fmtOLT(olt.sinal_tx,2,' dBm')}</div></div>
         <div class="olt-item ${sinalCls(olt.sinal_olt)}"><div class="olt-label">RX OLT</div><div class="olt-val">${fmtOLT(olt.sinal_olt,2,' dBm')}</div></div>
+        <div class="olt-item cinza"><div class="olt-label">CATV RX</div><div class="olt-val">${fmtOLT(olt.catv_rx,2,' dBm')}</div></div>
         <div class="olt-item ${tempCls(olt.temperatura)}"><div class="olt-label">Temperatura</div><div class="olt-val">${fmtOLT(olt.temperatura,1,'°C')}</div></div>
         <div class="olt-item cinza"><div class="olt-label">Tensão</div><div class="olt-val">${fmtOLT(olt.tensao,2,' V')}</div></div>
         <div class="olt-item cinza"><div class="olt-label">Corrente</div><div class="olt-val">${fmtOLT(olt.corrente,1,' mA')}</div></div>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="escuro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>IXC Lookup — Módulo do Técnico (mockup)</title>
+<style>
+  :root{
+    --bg:#0d1117; --bg2:#161b22; --bg3:#1c2128; --bg4:#262c36;
+    --b:#2d333b; --tx:#e6edf3; --tx2:#9aa5b1; --tx3:#6e7681;
+    --acc:#3b82f6; --g:#3fb950; --g3:#1a5c3a; --y:#d29922; --y3:#5c4a1a;
+    --r:#f85149; --r3:#5c1a1a; --roxo:#a371f7;
+    --radius:14px; --radius-sm:9px;
+    --font:'Segoe UI',system-ui,sans-serif; --font-mono:'SF Mono',Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{background:#000;font-family:var(--font);color:var(--tx);display:flex;justify-content:center;padding:14px;gap:18px;flex-wrap:wrap}
+  /* Moldura de celular */
+  .phone{width:400px;max-width:100%;height:820px;background:var(--bg);border-radius:28px;overflow:hidden;
+    border:1px solid var(--b);display:flex;flex-direction:column;box-shadow:0 18px 60px rgba(0,0,0,.6);position:relative}
+  .phone-label{position:absolute;top:-26px;left:0;font-size:12px;color:#666;font-weight:600}
+
+  /* Top bar */
+  .topbar{background:var(--bg2);border-bottom:1px solid var(--b);padding:12px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+  .topbar .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#a371f7);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .topbar .nome{font-weight:700;font-size:14px;line-height:1.1}
+  .topbar .sub{font-size:11px;color:var(--tx2)}
+  .topbar .badge-net{margin-left:auto;font-size:10px;background:var(--g3);color:var(--g);padding:3px 8px;border-radius:20px;font-weight:600}
+
+  .scroll{flex:1;overflow-y:auto;padding:14px}
+  .scroll::-webkit-scrollbar{width:0}
+
+  /* Bottom nav */
+  .nav{display:flex;background:var(--bg2);border-top:1px solid var(--b);flex-shrink:0}
+  .nav button{flex:1;background:none;border:none;color:var(--tx3);padding:9px 0 11px;font-size:10px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;font-family:inherit;position:relative}
+  .nav button .ic{font-size:19px}
+  .nav button.on{color:var(--acc)}
+  .nav button.on::before{content:'';position:absolute;top:0;left:25%;right:25%;height:2px;background:var(--acc);border-radius:2px}
+  .nav .dot{position:absolute;top:6px;right:30%;width:7px;height:7px;background:var(--r);border-radius:50%}
+
+  /* Cards */
+  .card{background:var(--bg2);border:1px solid var(--b);border-radius:var(--radius);padding:13px;margin-bottom:11px}
+  .card-h{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .card-h h3{font-size:14px;font-weight:700}
+  .sec-title{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--tx3);font-weight:700;margin:14px 0 8px}
+  .sec-title:first-child{margin-top:0}
+
+  .badge{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+  .badge.verde{background:var(--g3);color:#5ee07f}
+  .badge.amarelo{background:var(--y3);color:#e3b341}
+  .badge.vermelho{background:var(--r3);color:#ff7b72}
+  .badge.azul{background:#172d52;color:#6ea8ff}
+  .badge.roxo{background:#2d1a52;color:#c29bff}
+  .badge.cinza{background:var(--bg4);color:var(--tx2)}
+
+  .row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--b);font-size:13px}
+  .row:last-child{border-bottom:none}
+  .row .k{color:var(--tx2);font-size:12px}
+  .row .v{font-weight:600;text-align:right}
+
+  .btn{border:none;border-radius:var(--radius-sm);padding:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;display:flex;align-items:center;justify-content:center;gap:7px}
+  .btn-pri{background:var(--acc);color:#fff}
+  .btn-g{background:var(--g3);color:#5ee07f;border:1px solid #2a7048}
+  .btn-y{background:var(--y3);color:#e3b341;border:1px solid #7a6420}
+  .btn-r{background:var(--r3);color:#ff7b72;border:1px solid #7a2622}
+  .btn-ghost{background:var(--bg3);color:var(--tx);border:1px solid var(--b)}
+  .btn-sm{padding:8px 10px;font-size:12px;width:auto;flex:1}
+  .btns{display:flex;gap:8px;margin-top:11px}
+
+  /* Agenda - timeline OS */
+  .os-item{background:var(--bg2);border:1px solid var(--b);border-left:3px solid var(--acc);border-radius:var(--radius-sm);padding:11px 12px;margin-bottom:9px;cursor:pointer}
+  .os-item.deslocamento{border-left-color:var(--y)}
+  .os-item.execucao{border-left-color:var(--roxo)}
+  .os-item.finalizada{border-left-color:var(--g);opacity:.7}
+  .os-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+  .os-num{font-family:var(--font-mono);font-size:11px;color:var(--tx3)}
+  .os-cli{font-weight:700;font-size:14px;margin-bottom:2px}
+  .os-meta{font-size:11px;color:var(--tx2);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .os-hora{font-size:12px;font-weight:700;color:var(--acc)}
+
+  /* Stepper (ciclo de vida da OS) */
+  .stepper{display:flex;align-items:center;margin:4px 0 14px}
+  .step{flex:1;text-align:center;position:relative;font-size:9px;color:var(--tx3)}
+  .step .ball{width:22px;height:22px;border-radius:50%;background:var(--bg4);border:2px solid var(--b);margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;position:relative;z-index:2}
+  .step.done .ball{background:var(--g);border-color:var(--g);color:#04240f}
+  .step.now .ball{background:var(--acc);border-color:var(--acc);color:#fff;box-shadow:0 0 0 4px rgba(59,130,246,.25)}
+  .step.done,.step.now{color:var(--tx)}
+  .step::after{content:'';position:absolute;top:11px;left:-50%;width:100%;height:2px;background:var(--b);z-index:1}
+  .step:first-child::after{display:none}
+  .step.done::after,.step.now::after{background:var(--g)}
+
+  /* Diagnóstico CTO — barras de sinal dos vizinhos */
+  .sinal-self{background:linear-gradient(135deg,#172d52,#1c2128);border:1px solid var(--acc);border-radius:var(--radius-sm);padding:13px;margin-bottom:12px;text-align:center}
+  .sinal-self .big{font-size:30px;font-weight:800;font-family:var(--font-mono)}
+  .sinal-self .lbl{font-size:11px;color:var(--tx2);margin-top:2px}
+  .neigh{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--b);font-size:12px}
+  .neigh:last-child{border-bottom:none}
+  .neigh .porta{font-family:var(--font-mono);font-size:10px;color:var(--tx3);width:30px;flex-shrink:0}
+  .neigh .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .neigh .bar{width:84px;height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;flex-shrink:0}
+  .neigh .bar i{display:block;height:100%;border-radius:4px}
+  .neigh .dbm{width:62px;text-align:right;font-family:var(--font-mono);font-weight:700;flex-shrink:0}
+  .neigh.me{background:var(--bg3);margin:0 -6px;padding:7px 6px;border-radius:6px;border-bottom:none}
+  .neigh.me .nm{font-weight:800;color:var(--acc)}
+  .fill-g{background:var(--g)} .fill-y{background:var(--y)} .fill-r{background:var(--r)}
+  .t-g{color:#5ee07f} .t-y{color:#e3b341} .t-r{color:#ff7b72}
+
+  .diag-box{border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;font-size:12.5px;line-height:1.55}
+  .diag-box.inst{background:var(--g3);border:1px solid #2a7048}
+  .diag-box.rede{background:var(--y3);border:1px solid #7a6420}
+  .diag-box .t{font-weight:800;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+  .diag-box ul{margin:6px 0 0 16px}
+  .diag-box li{margin-bottom:3px}
+
+  .kpis{display:flex;gap:8px;margin-bottom:12px}
+  .kpi{flex:1;background:var(--bg3);border:1px solid var(--b);border-radius:var(--radius-sm);padding:9px;text-align:center}
+  .kpi .n{font-size:21px;font-weight:800}
+  .kpi .l{font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px}
+
+  /* Estoque */
+  .eq{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--b)}
+  .eq:last-child{border-bottom:none}
+  .eq .ico{width:36px;height:36px;border-radius:9px;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .eq .info{flex:1}
+  .eq .nm{font-weight:600;font-size:13px}
+  .eq .sn{font-family:var(--font-mono);font-size:10px;color:var(--tx3)}
+  .eq .qt{font-weight:800;font-size:16px}
+
+  .view{display:none}
+  .view.on{display:block;animation:fade .2s}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  .hint{font-size:11px;color:var(--tx3);text-align:center;margin:10px 0 2px;line-height:1.5}
+  .map-stub{height:120px;border-radius:var(--radius-sm);background:
+    repeating-linear-gradient(45deg,#1c2128,#1c2128 12px,#191e24 12px,#191e24 24px);
+    border:1px solid var(--b);display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px;margin-bottom:11px;position:relative}
+  .map-stub .pin{position:absolute;font-size:24px;top:38px;left:46%}
+</style>
+</head>
+<body>
+
+<!-- ════════ FRAME 1 ════════ -->
+<div class="phone">
+  <span class="phone-label">📱 Módulo do Técnico — protótipo navegável</span>
+
+  <div class="topbar">
+    <div class="av">JC</div>
+    <div>
+      <div class="nome">Téc. João Carlos</div>
+      <div class="sub">Equipe Campo · Zona Sul</div>
+    </div>
+    <span class="badge-net">● online</span>
+  </div>
+
+  <div class="scroll">
+
+    <!-- ===== VIEW: AGENDA ===== -->
+    <div class="view on" id="v-agenda">
+      <div class="kpis">
+        <div class="kpi"><div class="n" style="color:var(--acc)">5</div><div class="l">OS hoje</div></div>
+        <div class="kpi"><div class="n" style="color:var(--g)">2</div><div class="l">Finalizadas</div></div>
+        <div class="kpi"><div class="n" style="color:var(--y)">1</div><div class="l">Em rota</div></div>
+      </div>
+
+      <div class="sec-title">🟡 Em andamento</div>
+      <div class="os-item deslocamento" onclick="go('os')">
+        <div class="os-top"><span class="os-num">OS #48213</span><span class="badge amarelo">🚗 Deslocamento</span></div>
+        <div class="os-cli">Maria Aparecida Souza</div>
+        <div class="os-meta">📍 R. das Acácias, 142 · 2,1 km · <span class="os-hora">14:30</span></div>
+        <div class="os-meta" style="margin-top:4px">🔧 Sem conexão / sinal baixo · Contrato #30912</div>
+      </div>
+
+      <div class="sec-title">🔵 Agendadas — próximas</div>
+      <div class="os-item" onclick="go('os')">
+        <div class="os-top"><span class="os-num">OS #48219</span><span class="badge azul">Agendada</span></div>
+        <div class="os-cli">Carlos Eduardo Lima</div>
+        <div class="os-meta">📍 Av. Brasil, 887 · 3,8 km · <span class="os-hora">16:00</span></div>
+        <div class="os-meta" style="margin-top:4px">🛠 Instalação fibra · Contrato #31204</div>
+      </div>
+      <div class="os-item" onclick="go('os')">
+        <div class="os-top"><span class="os-num">OS #48224</span><span class="badge azul">Agendada</span></div>
+        <div class="os-cli">Condomínio Vista Verde</div>
+        <div class="os-meta">📍 R. Pinheiros, 55 · 5,1 km · <span class="os-hora">17:30</span></div>
+        <div class="os-meta" style="margin-top:4px">📡 Lentidão / quedas · Contrato #29881</div>
+      </div>
+
+      <div class="sec-title">🟢 Concluídas</div>
+      <div class="os-item finalizada">
+        <div class="os-top"><span class="os-num">OS #48201</span><span class="badge verde">✓ Finalizada</span></div>
+        <div class="os-cli">Pedro Henrique Alves</div>
+        <div class="os-meta">✔ 11:20 · Troca de ONU · assinatura coletada</div>
+      </div>
+
+      <p class="hint">Toque numa OS para abrir a tratativa →<br>tudo que você faz hoje no IXC, aqui no celular.</p>
+    </div>
+
+    <!-- ===== VIEW: OS (ciclo de vida) ===== -->
+    <div class="view" id="v-os">
+      <div class="card">
+        <div class="os-top"><span class="os-num">OS #48213</span><span class="badge amarelo">🚗 Deslocamento</span></div>
+        <div class="os-cli" style="font-size:16px">Maria Aparecida Souza</div>
+        <div class="os-meta">Contrato #30912 · Plano 500MB Fibra</div>
+
+        <!-- Ciclo de vida real do IXC -->
+        <div class="stepper" style="margin-top:14px">
+          <div class="step done"><div class="ball">✓</div>Aberta</div>
+          <div class="step done"><div class="ball">✓</div>Assumida</div>
+          <div class="step now"><div class="ball">3</div>Desloc.</div>
+          <div class="step"><div class="ball">4</div>Execução</div>
+          <div class="step"><div class="ball">5</div>Final.</div>
+        </div>
+
+        <div class="map-stub"><span class="pin">📍</span>mapa · rota até o cliente</div>
+
+        <div class="row"><span class="k">📞 Contato</span><span class="v">(11) 9 8812-4490</span></div>
+        <div class="row"><span class="k">📍 Endereço</span><span class="v" style="font-size:12px">R. das Acácias, 142</span></div>
+        <div class="row"><span class="k">🔧 Assunto</span><span class="v" style="font-size:12px">Sem conexão</span></div>
+        <div class="row"><span class="k">⏱ SLA</span><span class="v"><span class="badge azul">No prazo</span></span></div>
+
+        <div class="btns">
+          <button class="btn btn-ghost btn-sm">📞 Ligar</button>
+          <button class="btn btn-ghost btn-sm">🗺 Waze</button>
+          <button class="btn btn-ghost btn-sm" onclick="go('diag')">📡 Sinal</button>
+        </div>
+        <button class="btn btn-pri" style="margin-top:8px">📍 Cheguei — iniciar Execução</button>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h3>🧾 Encerramento da OS</h3></div>
+        <div class="sec-title">Solução aplicada</div>
+        <div class="row"><span class="k">Tipo de problema</span><span class="v"><span class="badge cinza">selecionar ▾</span></span></div>
+        <div class="row"><span class="k">Solução</span><span class="v"><span class="badge cinza">selecionar ▾</span></span></div>
+        <div class="row"><span class="k">📷 Fotos</span><span class="v">2 anexadas</span></div>
+        <div class="row"><span class="k">📦 Material usado</span><span class="v">1 conector + 12m drop</span></div>
+        <div class="row"><span class="k">✍ Assinatura cliente</span><span class="v"><span class="badge amarelo">pendente</span></span></div>
+        <button class="btn btn-g" style="margin-top:11px">✓ Finalizar Ordem de Serviço</button>
+        <p class="hint">Mesmos campos e códigos de fechamento do IXC —<br>grava direto via webhook n8n, sem abrir o iMaps.</p>
+      </div>
+    </div>
+
+    <!-- ===== VIEW: DIAGNÓSTICO CTO (★ feature pedida) ===== -->
+    <div class="view" id="v-diag">
+      <div class="card-h"><h3>📡 Diagnóstico da CTO</h3></div>
+      <div class="os-meta" style="margin-bottom:10px">CTO-1242 · Splitter 1:16 · PON 1/3 · OLT Centro</div>
+
+      <div class="sinal-self">
+        <div class="lbl">Sinal do cliente atual (RX ONU)</div>
+        <div class="big t-r">-27.4 <span style="font-size:15px">dBm</span></div>
+        <div class="lbl">Maria A. Souza · porta 07</div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="n">14</div><div class="l">na CTO</div></div>
+        <div class="kpi"><div class="n t-g">-19.1</div><div class="l">média dBm</div></div>
+        <div class="kpi"><div class="n t-r">1</div><div class="l">crítico</div></div>
+      </div>
+
+      <!-- DIAGNÓSTICO AUTOMÁTICO -->
+      <div class="diag-box inst">
+        <div class="t">🟢 Causa provável: INSTALAÇÃO (cliente isolado)</div>
+        Os outros <b>13 clientes desta CTO estão OK</b> (média -19,1 dBm). Só este cliente está a <b>-27,4 dBm</b> — 8 dB abaixo dos vizinhos.
+        <ul>
+          <li>Problema NÃO é da rede/splitter.</li>
+          <li>Verificar drop do cliente (caixa → casa).</li>
+          <li>Inspecionar conector na ONU e na porta 07.</li>
+          <li>Checar curvas/dobras no cabo interno.</li>
+        </ul>
+        <b>➡ Resolução no local (você mesmo).</b>
+      </div>
+
+      <div class="sec-title">Vizinhos na mesma CTO — comparação</div>
+      <div class="card" style="margin-bottom:0">
+        <div class="neigh me">
+          <span class="porta">P07</span><span class="nm">Maria A. (atual)</span>
+          <span class="bar"><i class="fill-r" style="width:18%"></i></span>
+          <span class="dbm t-r">-27.4</span>
+        </div>
+        <div class="neigh">
+          <span class="porta">P01</span><span class="nm">João P. Ferreira</span>
+          <span class="bar"><i class="fill-g" style="width:82%"></i></span>
+          <span class="dbm t-g">-18.2</span>
+        </div>
+        <div class="neigh">
+          <span class="porta">P02</span><span class="nm">Ana Cláudia M.</span>
+          <span class="bar"><i class="fill-g" style="width:79%"></i></span>
+          <span class="dbm t-g">-18.9</span>
+        </div>
+        <div class="neigh">
+          <span class="porta">P03</span><span class="nm">Roberto Dias</span>
+          <span class="bar"><i class="fill-g" style="width:85%"></i></span>
+          <span class="dbm t-g">-17.6</span>
+        </div>
+        <div class="neigh">
+          <span class="porta">P05</span><span class="nm">Luciana Castro</span>
+          <span class="bar"><i class="fill-y" style="width:58%"></i></span>
+          <span class="dbm t-y">-21.3</span>
+        </div>
+        <div class="neigh">
+          <span class="porta">P08</span><span class="nm">Mercado São Jorge</span>
+          <span class="bar"><i class="fill-g" style="width:80%"></i></span>
+          <span class="dbm t-g">-18.7</span>
+        </div>
+        <div class="neigh" style="opacity:.6">
+          <span class="porta">P09</span><span class="nm">+ 9 clientes OK…</span>
+          <span class="bar"><i class="fill-g" style="width:78%"></i></span>
+          <span class="dbm t-g">~-19</span>
+        </div>
+      </div>
+
+      <p class="hint">Se 6+ destes estivessem ruins → diagnóstico mudaria<br>para 🟡 <b>CAIXA/SPLITTER</b> e abriria OS para a equipe de rede.</p>
+    </div>
+
+    <!-- ===== VIEW: ESTOQUE ===== -->
+    <div class="view" id="v-estoque">
+      <div class="card-h"><h3>📦 Meu estoque</h3></div>
+      <div class="kpis">
+        <div class="kpi"><div class="n">8</div><div class="l">ONUs</div></div>
+        <div class="kpi"><div class="n">320m</div><div class="l">drop</div></div>
+        <div class="kpi"><div class="n t-y">3</div><div class="l">a repor</div></div>
+      </div>
+
+      <div class="card">
+        <div class="sec-title">Equipamentos (comodato)</div>
+        <div class="eq"><div class="ico">📡</div><div class="info"><div class="nm">ONU Intelbras 121AC</div><div class="sn">8 em mãos · faixa SN ...A41–A48</div></div><div class="qt">8</div></div>
+        <div class="eq"><div class="ico">📶</div><div class="info"><div class="nm">Roteador Archer C6</div><div class="sn">3 em mãos</div></div><div class="qt">3</div></div>
+        <div class="eq"><div class="ico">🔌</div><div class="info"><div class="nm">Conector APC verde</div><div class="sn">repor — restam 4</div></div><div class="qt t-y">4</div></div>
+        <div class="eq"><div class="ico">🧵</div><div class="info"><div class="nm">Cabo drop (metros)</div><div class="sn">bobina parcial</div></div><div class="qt">320</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-h"><h3>📋 Movimentações de hoje</h3></div>
+        <div class="row"><span class="k">OS #48201 · ONU SN ...A39</span><span class="v t-r">-1</span></div>
+        <div class="row"><span class="k">OS #48201 · drop 25m</span><span class="v t-r">-25m</span></div>
+        <div class="row"><span class="k">Retirada almox. manhã</span><span class="v t-g">+10 ONU</span></div>
+        <button class="btn btn-ghost" style="margin-top:11px">📷 Baixar equipamento por leitura de SN</button>
+      </div>
+      <p class="hint">Espelha o estoque do técnico no IXC —<br>baixa automática ao finalizar a OS.</p>
+    </div>
+
+  </div>
+
+  <div class="nav">
+    <button class="on" data-v="agenda" onclick="go('agenda')"><span class="ic">📅</span>Agenda</button>
+    <button data-v="os" onclick="go('os')"><span class="ic">🧾</span>OS<span class="dot"></span></button>
+    <button data-v="diag" onclick="go('diag')"><span class="ic">📡</span>Diagnóstico</button>
+    <button data-v="estoque" onclick="go('estoque')"><span class="ic">📦</span>Estoque</button>
+  </div>
+</div>
+
+<script>
+  function go(v){
+    document.querySelectorAll('.view').forEach(e=>e.classList.remove('on'));
+    document.getElementById('v-'+v).classList.add('on');
+    document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+    document.querySelector('.scroll').scrollTop=0;
+  }
+</script>
+</body>
+</html>

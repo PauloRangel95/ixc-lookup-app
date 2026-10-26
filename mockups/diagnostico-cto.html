@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-tema="escuro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diagnóstico de CTO — protótipo funcional</title>
+<style>
+  :root{
+    --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#262c36;--b:#2d333b;
+    --tx:#e6edf3;--tx2:#9aa5b1;--tx3:#6e7681;--acc:#3b82f6;
+    --g:#3fb950;--g3:#1a5c3a;--y:#d29922;--y3:#5c4a1a;--r:#f85149;--r3:#5c1a1a;
+    --radius:14px;--radius-sm:9px;--font:'Segoe UI',system-ui,sans-serif;--font-mono:'SF Mono',Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000;font-family:var(--font);color:var(--tx);display:flex;justify-content:center;padding:14px}
+  .phone{width:420px;max-width:100%;background:var(--bg);border-radius:24px;border:1px solid var(--b);padding:16px;box-shadow:0 18px 60px rgba(0,0,0,.6)}
+  h2{font-size:16px;margin-bottom:2px}
+  .sub{font-size:11px;color:var(--tx2);margin-bottom:14px}
+  .scenario{display:flex;gap:8px;margin-bottom:16px}
+  .scenario button{flex:1;background:var(--bg3);border:1px solid var(--b);color:var(--tx2);padding:9px;border-radius:var(--radius-sm);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .scenario button.on{background:var(--acc);border-color:var(--acc);color:#fff}
+
+  .sinal-self{background:linear-gradient(135deg,#172d52,#1c2128);border:1px solid var(--acc);border-radius:var(--radius-sm);padding:14px;margin-bottom:12px;text-align:center}
+  .sinal-self .big{font-size:32px;font-weight:800;font-family:var(--font-mono)}
+  .sinal-self .lbl{font-size:11px;color:var(--tx2)}
+
+  .kpis{display:flex;gap:8px;margin-bottom:12px}
+  .kpi{flex:1;background:var(--bg3);border:1px solid var(--b);border-radius:var(--radius-sm);padding:9px;text-align:center}
+  .kpi .n{font-size:20px;font-weight:800}
+  .kpi .l{font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:.4px}
+
+  .diag-box{border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:12.5px;line-height:1.55}
+  .diag-box.inst{background:var(--g3);border:1px solid #2a7048}
+  .diag-box.rede{background:var(--y3);border:1px solid #7a6420}
+  .diag-box.crit{background:var(--r3);border:1px solid #7a2622}
+  .diag-box .t{font-weight:800;font-size:13px;margin-bottom:6px}
+  .diag-box ul{margin:6px 0 0 16px}.diag-box li{margin-bottom:3px}
+
+  .sec-title{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--tx3);font-weight:700;margin:0 0 8px}
+  .card{background:var(--bg2);border:1px solid var(--b);border-radius:var(--radius);padding:12px}
+  .neigh{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--b);font-size:12px}
+  .neigh:last-child{border-bottom:none}
+  .neigh .porta{font-family:var(--font-mono);font-size:10px;color:var(--tx3);width:34px;flex-shrink:0}
+  .neigh .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .neigh .bar{width:80px;height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;flex-shrink:0}
+  .neigh .bar i{display:block;height:100%;border-radius:4px}
+  .neigh .dbm{width:66px;text-align:right;font-family:var(--font-mono);font-weight:700;flex-shrink:0}
+  .neigh.me{background:var(--bg3);margin:0 -6px;padding:7px 6px;border-radius:6px;border-bottom:none}
+  .neigh.me .nm{font-weight:800;color:var(--acc)}
+  .fill-g{background:var(--g)}.fill-y{background:var(--y)}.fill-r{background:var(--r)}.fill-c{background:var(--tx3)}
+  .t-g{color:#5ee07f}.t-y{color:#e3b341}.t-r{color:#ff7b72}.t-c{color:var(--tx3)}
+  .foot{font-size:10px;color:var(--tx3);margin-top:14px;line-height:1.5;border-top:1px solid var(--b);padding-top:10px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <h2>📡 Diagnóstico da CTO</h2>
+  <div class="sub" id="cto-sub">—</div>
+
+  <div class="scenario">
+    <button class="on" onclick="carregar('isolado',this)">1 cliente ruim</button>
+    <button onclick="carregar('caixa',this)">CTO inteira</button>
+    <button onclick="carregar('ok',this)">Tudo OK</button>
+  </div>
+
+  <div id="saida"></div>
+
+  <div class="foot">
+    ⚙️ Este protótipo roda a <b>lógica real de diagnóstico</b> sobre o JSON que o endpoint
+    <code>ftth/equipment/realtime</code> já retorna hoje (campos <code>rx_onu</code>, <code>status</code>,
+    <code>cto.name</code>, <code>cto.port</code>). A função <code>diagnosticarCTO()</code> abaixo é a que
+    vai pro <code>popup.js</code>. Troque os cenários acima para ver a classificação mudar sozinha.
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  MÓDULO DE DIAGNÓSTICO  — drop-in para popup.js
+//  Entrada: results[] do endpoint ftth/equipment/realtime
+//  + serial/pppoe do cliente-alvo
+// ════════════════════════════════════════════════════════════
+
+// Faixas iguais às do app (CFG_SINAL em popup.js)
+const CFG_SINAL = { verde:-18, amarelo:-20 };
+const SEM_LEITURA = v => v == null || v <= -40 || v === 0;   // -99.99 / 0 = sem sinal
+
+function sinalStatus(rx, online){
+  if (!online) return 'offline';
+  if (SEM_LEITURA(rx)) return 'offline';
+  if (rx >= CFG_SINAL.verde)   return 'ok';
+  if (rx >= CFG_SINAL.amarelo) return 'warning';
+  return 'critical';
+}
+const ehAfetado = st => st === 'critical' || st === 'warning' || st === 'offline';
+
+// Thresholds portados de rootCauseAnalysis.ts (pasta OLT OZ)
+const TH = { CAIXA_MIN_AFFECTED:2, CAIXA_PERCENT:40 };
+
+function diagnosticarCTO(results, alvoPppoe){
+  // 1. acha o alvo e a CTO dele
+  const alvo = results.find(o => (o.client?.login_pppoe||'') === alvoPppoe) || results[0];
+  const ctoId = alvo.cto?.id ?? null;
+
+  // 2. vizinhos = mesma CTO (se houver CTO) senão a PON inteira
+  const grupo = ctoId != null
+    ? results.filter(o => o.cto?.id === ctoId)
+    : results.slice();
+
+  // 3. estatísticas
+  const enrich = o => {
+    const online = o.status === 'Online';
+    const st = sinalStatus(o.rx_onu, online);
+    return { ...o, online, st, afetado: ehAfetado(st) };
+  };
+  const lista = grupo.map(enrich).sort((a,b)=> (a.cto?.port||0)-(b.cto?.port||0));
+  const alvoE = enrich(alvo);
+
+  const total = lista.length;
+  const afetados = lista.filter(o => o.afetado).length;
+  const pct = total ? Math.round(100*afetados/total) : 0;
+  const validos = lista.filter(o => !SEM_LEITURA(o.rx_onu) && o.online).map(o=>o.rx_onu);
+  const media = validos.length ? validos.reduce((s,v)=>s+v,0)/validos.length : null;
+  const min = validos.length ? Math.min(...validos) : null;
+
+  // 4. classificação (mesma regra da view v_caixa_impact)
+  let causa, plano;
+  if (afetados === 0){
+    causa = { layer:'ok', team:'monitoramento', sev:'ok', titulo:'✅ CTO saudável' };
+    plano = ['Todos os clientes desta CTO estão com sinal normal.','Nenhuma ação necessária.'];
+  } else if (afetados >= TH.CAIXA_MIN_AFFECTED && pct >= TH.CAIXA_PERCENT){
+    causa = { layer:'caixa', team:'rede', sev:'rede', titulo:'🟡 Causa provável: CAIXA / SPLITTER' };
+    plano = [
+      `${afetados} de ${total} clientes (${pct}%) afetados na MESMA CTO.`,
+      'Padrão sistêmico → problema NÃO é de um cliente isolado.',
+      'Verificar splitter da CTO (oxidação, conector, queima).',
+      'Medir potência na entrada da caixa (esperado ~-15 dBm).',
+      'Inspecionar fibra de chegada (drop primário da PON).',
+      '➡ Acionar equipe de REDE / planta externa.'
+    ];
+  } else {
+    const assimetria = (alvoE.rx_onu!=null && alvoE.rx_olt!=null && !SEM_LEITURA(alvoE.rx_onu))
+      ? Math.abs(alvoE.rx_onu - alvoE.rx_olt) : null;
+    causa = { layer:'instalacao', team:'campo', sev: alvoE.st==='offline'?'crit':'inst',
+      titulo: alvoE.st==='offline' ? '🔴 Cliente OFFLINE (instalação)' : '🟢 Causa provável: INSTALAÇÃO (cliente isolado)' };
+    plano = alvoE.st==='offline'
+      ? ['Cliente sem sinal / sem energia na ONU.','Verificar alimentação e conector do drop na ONU.','Luz PON deve estar verde fixa.','Substituir ONU se necessário.','➡ Resolução no local (campo).']
+      : [
+          `Demais ${total-afetados} clientes da CTO estão OK (média ${media!=null?media.toFixed(1):'—'} dBm).`,
+          `Só este cliente está ruim (${alvoE.rx_onu?.toFixed(1)} dBm) → problema NÃO é da rede.`,
+          assimetria!=null && assimetria>5 ? `Assimetria RX ONU↔OLT de ${assimetria.toFixed(1)} dB → perda no drop/conector.` : 'Verificar drop do cliente (caixa → casa).',
+          'Inspecionar conector na ONU e na porta da CTO.',
+          'Checar curvas/dobras no cabo interno.',
+          '➡ Resolução no local (você mesmo).'
+        ];
+  }
+
+  return { alvoE, cto:alvo.cto, lista, total, afetados, pct, media, min, causa, plano };
+}
+
+// ════════════════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════════════════
+const clsFill = st => st==='ok'?'fill-g':st==='warning'?'fill-y':st==='critical'?'fill-r':'fill-c';
+const clsTxt  = st => st==='ok'?'t-g':st==='warning'?'t-y':st==='critical'?'t-r':'t-c';
+// barra: -10dBm=100% … -30dBm=0%
+const larg = rx => SEM_LEITURA(rx) ? 6 : Math.max(6, Math.min(100, Math.round(((rx+30)/20)*100)));
+const dbmTxt = (rx,online) => (!online||SEM_LEITURA(rx)) ? 'sem sinal' : rx.toFixed(1);
+
+function render(d){
+  document.getElementById('cto-sub').textContent =
+    `${d.cto?.name||'CTO ?'} · ${d.total} clientes · OLT/PON em tempo real`;
+
+  const a = d.alvoE;
+  let h = `<div class="sinal-self">
+      <div class="lbl">Sinal do cliente atual (RX ONU)</div>
+      <div class="big ${clsTxt(a.st)}">${dbmTxt(a.rx_onu,a.online)}${(a.online&&!SEM_LEITURA(a.rx_onu))?' <span style="font-size:15px">dBm</span>':''}</div>
+      <div class="lbl">${a.client?.name||'—'} · porta ${a.cto?.port??'?'}</div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="n">${d.total}</div><div class="l">na CTO</div></div>
+      <div class="kpi"><div class="n t-g">${d.media!=null?d.media.toFixed(1):'—'}</div><div class="l">média dBm</div></div>
+      <div class="kpi"><div class="n ${d.afetados?'t-r':'t-g'}">${d.afetados}</div><div class="l">afetados</div></div>
+    </div>`;
+
+  h += `<div class="diag-box ${d.causa.sev}">
+      <div class="t">${d.causa.titulo}</div>
+      <ul>${d.plano.map(p=>`<li>${p}</li>`).join('')}</ul>
+    </div>`;
+
+  h += `<div class="sec-title">Vizinhos na mesma CTO — comparação</div><div class="card">` +
+    d.lista.map(o=>{
+      const me = o===a || (o.client?.login_pppoe===a.client?.login_pppoe);
+      return `<div class="neigh ${me?'me':''}">
+        <span class="porta">P${o.cto?.port??'?'}</span>
+        <span class="nm">${(o.client?.name||o.sn_onu||'—')}${me?' (atual)':''}</span>
+        <span class="bar"><i class="${clsFill(o.st)}" style="width:${larg(o.rx_onu)}%"></i></span>
+        <span class="dbm ${clsTxt(o.st)}">${dbmTxt(o.rx_onu,o.online)}</span>
+      </div>`;
+    }).join('') + `</div>`;
+
+  document.getElementById('saida').innerHTML = h;
+}
+
+// ════════════════════════════════════════════════════════════
+//  DADOS DE EXEMPLO (formato idêntico ao realtime real)
+// ════════════════════════════════════════════════════════════
+function gerar(cenario){
+  const nomes=['João P. Ferreira','Ana Cláudia M.','Roberto Dias','Maria A. Souza','Luciana Castro','Mercado São Jorge','Paulo R. Nunes','Célia Andrade','Edson Vieira','Família Tavares'];
+  const cto={ id:3933, name:'NAP CTRO-01-12', external_id:'11662' };
+  const base = nomes.map((nm,i)=>({
+    id:21000+i, onu_id:i, sn_onu:'ZTEG'+(1000+i), status:'Online',
+    rx_onu: -17 - Math.random()*2.5, rx_olt: -18 - Math.random()*2,
+    client:{ name:nm, login_pppoe:'cli'+i+'@provedor', external_contract_id:String(30900+i) },
+    cto:{ ...cto, port:i+1 }
+  }));
+  const alvo='cli3@provedor'; // Maria A. Souza
+  if (cenario==='isolado'){
+    const m=base.find(o=>o.client.login_pppoe===alvo); m.rx_onu=-27.4; m.rx_olt=-19.1;
+  } else if (cenario==='caixa'){
+    base.forEach((o,i)=>{ if(i<7){ o.rx_onu=-24-Math.random()*3; o.rx_olt=-22-Math.random()*2; } });
+    base[3].status='Sem Energia'; base[3].rx_onu=-99.99; base[3].rx_olt=-99.99;
+  }
+  return { results: base, alvo };
+}
+
+function carregar(cenario, btn){
+  document.querySelectorAll('.scenario button').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  const { results, alvo } = gerar(cenario);
+  render(diagnosticarCTO(results, alvo));
+}
+carregar('isolado', document.querySelector('.scenario button'));
+</script>
+</body>
+</html>
