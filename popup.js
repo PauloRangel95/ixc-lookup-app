@@ -2737,6 +2737,17 @@ async function buscarOLT(logins) {
     // Salvar olt_cloud em dadosAtual para o copiar tudo
     if (dadosAtual) dadosAtual._olt_cloud = olt_cloud;
 
+    // Loga o resultado do OLT Cloud por técnico (o erro antes só ia pra UI e ficava invisível
+    // nos logs) — assim dá pra ver se é permissão/escopo da conta vs flaky vs HTTP.
+    try {
+      Logger.registrarLog(sessaoAtual,'CONSULTA_OLT',{
+        contrato_id: (dadosAtual&&dadosAtual.contrato_id)||null,
+        sucesso: erros.length===0,
+        erro: erros.length? erros.join(' | ') : null,
+        detalhes:{ achados:Object.keys(olt_cloud).length, falhas:erros.length, logins:logins.length }
+      });
+    } catch(_){}
+
     // Mostrar erros + botão fallback IXC
     if (erros.length) {
       erros.forEach(erro=>{

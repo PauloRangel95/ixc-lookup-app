@@ -60,7 +60,7 @@
 
   window.chrome.runtime = window.chrome.runtime || {};
   // Mantenha em sincronia com o manifest da extensão ao subir versão.
-  window.chrome.runtime.getManifest = () => ({ version: '1.9.0' });
+  window.chrome.runtime.getManifest = () => ({ version: '1.9.1' });
   window.chrome.runtime.getURL = (path) => new URL(path, location.href).href;
 
   window.chrome.tabs = window.chrome.tabs || {};
