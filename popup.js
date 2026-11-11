@@ -2627,7 +2627,8 @@ async function buscarOLT(logins) {
           try { resEq=await fetch(`${OLT_BASE}/ftth/equipment/list?client_pppoe=${pppoe}`,{headers:hdrs}); }
           catch(_) { continue; }
           lastStatus=resEq.status;
-          if (!resEq.ok) continue;
+          if (resEq.status===401||resEq.status===403) break; // auth/permissão: repetir não resolve
+          if (!resEq.ok) continue;                            // 5xx/transitório: tenta de novo
           const eqData=await resEq.json();
           eq=eqData?.results?.[0]||null;
           if (eq?.id) break;
