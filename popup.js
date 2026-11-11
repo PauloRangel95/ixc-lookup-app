@@ -2618,11 +2618,22 @@ async function buscarOLT(logins) {
     for (const l of logins) {
       try {
         const pppoe=encodeURIComponent(l.login);
-        const resEq=await fetch(`${OLT_BASE}/ftth/equipment/list?client_pppoe=${pppoe}`,{headers:hdrs});
-        if (!resEq.ok) { erros.push(`${l.login}: HTTP ${resEq.status}`); continue; }
-        const eqData=await resEq.json();
-        const eq=eqData?.results?.[0];
-        if (!eq?.id) { erros.push(`${l.login}: não encontrado no OLT Cloud`); continue; }
+        // O OLT Cloud às vezes responde 200 com lista VAZIA na 1ª consulta por client_pppoe
+        // (consistência eventual — "pesquiso de novo e acha"). Repete com backoff antes de desistir.
+        let eq=null, lastStatus=0;
+        for (let tent=0; tent<3; tent++){
+          if (tent) await new Promise(r=>setTimeout(r, 700*tent));
+          let resEq;
+          try { resEq=await fetch(`${OLT_BASE}/ftth/equipment/list?client_pppoe=${pppoe}`,{headers:hdrs}); }
+          catch(_) { continue; }
+          lastStatus=resEq.status;
+          if (!resEq.ok) continue;
+          const eqData=await resEq.json();
+          eq=eqData?.results?.[0]||null;
+          if (eq?.id) break;
+          eq=null;
+        }
+        if (!eq?.id) { erros.push(`${l.login}: não encontrado no OLT Cloud`+(lastStatus&&lastStatus!==200?` (HTTP ${lastStatus})`:'')); continue; }
 
         // Buscar detalhes + alertas + histórico + PON realtime em paralelo
         // v1.7.5 — wrapper que silencia 404 (esperado quando não há alertas/dados)
