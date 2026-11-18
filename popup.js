@@ -12,6 +12,7 @@ const WEBHOOK_OZMAP_MAPA = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook
 const WEBHOOK_OZMAP_CRIAR = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-ozmap-criar'; // criar/apagar no OZmap (Fase 3, escrita)
 const OZMAP_CRIAR_LOGIN_TESTE = '9441'; // nesta fase, criação liberada só p/ este login de teste
 const WEBHOOK_HISTSZ   = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/ixc-histsz'; // histórico SZ Chat (Supabase via n8n)
+const WEBHOOK_CHECKLIST = 'https://carajasnet-n8n.bwadmr.easypanel.host/webhook/checklist-acao'; // Checklists pre-operacionais (fluxo isolado — n8n de producao)
 
 // ── Toggle de token (v1.6) ──
 // Modo padrão na 1ª vez: master (mais seguro — não dá erro inesperado)
@@ -3401,4 +3402,657 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       logo.title = `CKS Lookup v${mf.version}`;
     }
   } catch(e) { /* ignora — manifest sempre acessível */ }
+})();
+
+/* ========================================================================= *
+ * CHECKLISTS PRE-OPERACIONAIS (diarios) — portado do PWA de teste.           *
+ * Autocontido (IIFE). Identidade via sessaoAtual (PWA de producao).          *
+ * Backend: WEBHOOK_CHECKLIST (n8n prod) -> Supabase cks_pwa_checklists.      *
+ * ========================================================================= */
+(function(){
+  'use strict';
+  if (window.__cklInit) return; window.__cklInit = true;
+
+  const APP_VER = 'ckl-v1';
+
+  // ---- Definições dos checklists -----------------------------------------
+  const CKL = {
+    veiculo: {
+      titulo:'Veículo Leve', icone:'🚗', ident:'placa', identLabel:'Placa',
+      header:[
+        {k:'placa',       label:'Placa',        req:true},
+        {k:'carro',       label:'Carro / Modelo'},
+        {k:'matricula',   label:'Matrícula'},
+        {k:'km_inicial',  label:'KM inicial', tipo:'number', hint:'na abertura'},
+        {k:'km_final',    label:'KM final',   tipo:'number', hint:'no fim do dia — deixe em branco ao abrir'},
+        {k:'local',       label:'Local'}
+      ],
+      fotosObrig:[
+        {slot:'lateral_esq', label:'Lateral esquerda'},
+        {slot:'lateral_dir', label:'Lateral direita'},
+        {slot:'frente',      label:'Frente'},
+        {slot:'traseira',    label:'Traseira'},
+        {slot:'interna',     label:'Interna (painel)'}
+      ],
+      selfie:{slot:'selfie', label:'Selfie do colaborador com o veículo'},
+      itens:[
+        'Os faróis alto e baixo estão funcionando?',
+        'As setas, luz de freio, luz traseira, de ré e advertência estão funcionando?',
+        'Parabrisa, vidros laterais e traseiro estão em bom estado?',
+        'Os limpadores de pára-brisa e o esguicho de água estão funcionando?',
+        'Existe o kit de emergência (2 coletes e 2 cones), triângulo, macaco e chave de roda no veículo?',
+        'A iluminação interna, buzina e luz da placa estão funcionando?',
+        'O veículo está livre de vazamento de óleo/combustível/água?',
+        'Pneus dianteiros, traseiros e sobressalente estão em bom estado?',
+        'O retrovisor interno e externos estão em bom estado?',
+        'Os indicadores de painel estão funcionando?',
+        'Os cintos de segurança para todos os ocupantes do veículo estão funcionando?',
+        'O extintor de incêndio pó ABC está pressurizado e dentro da validade?',
+        'O sistema de freio e o freio de estacionamento estão funcionando?',
+        'O sistema de registro/monitoramento de velocidade está funcionando?',
+        'O documento do veículo (CRLV) está em dias?',
+        'A validade e a categoria da CNH do condutor estão de acordo com o veículo que está conduzindo?'
+      ]
+    },
+    escada: {
+      titulo:'Escadas e Passarelas', icone:'🪜', ident:'tag', identLabel:'Identificação/TAG',
+      selfie:{slot:'selfie', label:'Selfie do colaborador com o equipamento'},
+      header:[
+        {k:'objeto', label:'Objeto da inspeção'},
+        {k:'tag',    label:'Identificação / TAG', req:true},
+        {k:'local',  label:'Local'}
+      ],
+      itens:[
+        'A escada simples possui comprimento máximo – 7m?',
+        'A escada extensível possui comprimento máximo – 12m?',
+        'Possui os degraus em material não condutor?',
+        'Possui as condições originais do fabricante?',
+        'Possui sapatas antiderrapantes?',
+        'Possui sinalização da carga máxima?',
+        'Possui espaçamento entre os degraus uniforme, não excedendo 30 cm?',
+        'Estão pintadas?'
+      ]
+    },
+    cinto: {
+      titulo:'Cinto de Segurança', icone:'🦺', ident:'tag', identLabel:'Identificação/TAG',
+      selfie:{slot:'selfie', label:'Selfie do colaborador com o equipamento'},
+      header:[
+        {k:'fornecedor', label:'Fornecedor de serviço'},
+        {k:'objeto',     label:'Objeto da inspeção'},
+        {k:'tag',        label:'Identificação / TAG', req:true},
+        {k:'local',      label:'Local'}
+      ],
+      itens:[
+        'As costuras são de cores contrastantes e estão livres de rupturas?',
+        'O cinto está em boas condições e não possui sinais que já sofreu tensionamento de queda (costura de "marca de queda" solta)?',
+        'Os cintos são do tipo pára-quedista dotados de argolas, fivelas, mosquetões de aço forjado com trava dupla, duplo talabarte em "Y" com amortecedor e mosquetão de 3" com trava dupla?',
+        'Para atividade de corte ou à quente o cinto é de material não combustível e está equipado com talabarte provido de alma de aço?',
+        'Travas, molas e conexões dos mosquetões estão livres de folga?',
+        'Os ganchos e mosquetões não apresentam defeito pelo mau uso ou pelo uso excessivo?',
+        'Os ganchos travam, não se encontram amassados, tortos, gatilho emperrado, deformações, oxidações, etc?',
+        'Corda ou fita do talabarte está livre de avarias e danos?',
+        'Os talabartes não apresentam costuras, desfiamento, fios rompidos?',
+        'As fitas não apresentam cortes, furos, queimaduras, desgaste excessivo (fitas puídas), nem terem sofrido contato com produtos químicos?',
+        'O absorvedor de energia não apresenta rompimento?',
+        'Possui o talabarte de posicionamento?'
+      ]
+    },
+    furadeira: {
+      titulo:'Furadeira Portátil', icone:'🛠️', ident:'tag', identLabel:'Identificação/TAG',
+      selfie:{slot:'selfie', label:'Selfie do colaborador com o equipamento'},
+      header:[
+        {k:'fornecedor', label:'Fornecedor de serviço'},
+        {k:'objeto',     label:'Objeto da inspeção'},
+        {k:'tag',        label:'Identificação / TAG', req:true},
+        {k:'local',      label:'Local'}
+      ],
+      itens:[
+        'A broca é adequada ao tipo de material a ser perfurado?',
+        'A broca não se encontra torta e está afiada?',
+        'Aterramento instalado adequadamente?',
+        'Cabo com duplo isolamento e livre de emendas, avarias e danos?',
+        'Corpo da máquina livre de avarias e danos?',
+        'Existem chaves mandril apropriadas para troca da broca?',
+        'Interruptor liga / desliga funcionando?',
+        'Não existem vibrações anormais quando em funcionamento?',
+        'O mandril está perfeito e sem dentes quebrados?',
+        'Plug padrão industrial ou stack?',
+        'Possui chave liga/desliga?',
+        'Possui imã liga/desliga?'
+      ]
+    },
+    pt: {
+      titulo:'Permissão de Trabalho (PT)', icone:'📋', especial:true, ident:'local', identLabel:'Local de trabalho',
+      selfie:{slot:'selfie', label:'Selfie do colaborador no local'},
+      campos:[
+        {k:'data_inicial', label:'Data inicial', tipo:'date'},
+        {k:'hora_inicial', label:'Hora inicial', tipo:'time'},
+        {k:'data_final',   label:'Data final',   tipo:'date', hint:'no fim do dia'},
+        {k:'hora_final',   label:'Hora final',   tipo:'time', hint:'no fim do dia'},
+        {k:'empresa',      label:'Nome da empresa'},
+        {k:'encarregado',  label:'Encarregado(s)'},
+        {k:'local',        label:'Local de trabalho', req:true},
+        {k:'n_funcionarios', label:'Nº de funcionários', tipo:'number'}
+      ],
+      descricao:true,
+      atividade:['Altura e/ou telhados, níveis elevados, escadas, postes, torres ou outros','Trabalhos próximos a eletricidade'],
+      maodeobra:['Interna','Externa','Outros'],
+      simnao:[{k:'fds',label:'Fim de semana / feriado'},{k:'area_restrita',label:'Área restrita'}],
+      grupos:[
+        {k:'perigos', titulo:'Perigos potenciais', ops:[
+          'Projeção de partículas','Levantamento/transporte de peso','Detonações','Produtos inflamáveis',
+          'Manuseio produtos inflamáveis (fogo, explosões)','Explosão','Choque elétrico','Demolição',
+          'Exposição a poeiras','Ruído excessivo','Escavação/desmoronamento','Exposição a gases e vapores',
+          'Queda diferença nível - trabalho em altura','Queda de escada','Manuseio de equipamento de guindar',
+          'Piso escorregadio','Queda de andaimes','Movimentação de máquinas','Contato de produto químico com a pele',
+          'Radiação não ionizante','Uso de veículo - atropelamento','Queda de objetos em geral','Exposição a fumos metálicos',
+          'Trabalho em espaço confinado','Trabalho sobre telhado','Trabalho a quente','Expor terceiros a perigos',
+          'Concentração de vapores orgânicos – incêndio, explosão','Trabalho a quente ou projeção de faíscas em áreas com risco de explosão',
+          'Contato com ferramentas, equipamentos e peças com cantos vivos, rebarbas','Queda do poste','Queda da torre','Outros'
+        ]},
+        {k:'epis', titulo:'EPIs necessários', ops:[
+          'Óculos de segurança incolor','Óculos de segurança lente escura','Capacete para eletricista','Protetor facial – escudo rosto',
+          'Máscara de soldador - escudo','Escudo de proteção contra arco elétrico','Protetor auricular plug','Protetor auricular concha',
+          'Capacete','Capacete com jugular - trabalho altura','Uniforme para eletricista','Respirador para poeiras, névoas e fumos',
+          'Respirador para vapores orgânicos','Respiradores para gases ácidos','Respirador com filtros combinados','Cinto tipo paraquedista',
+          'Talabarte Y ou 2 talabartes','Perneira','Sapato c/ biqueira','Sapatos / biqueira','Sapato de eletricista','Luva nitrílica',
+          'Luva látex','Luva PVC','Luva malha','Luva vaqueta','Luva ryflex','Luva isolante classe 2','Luva isolante classe 0',
+          'Luva alta tensão isolada','Avental de raspa','Macacão de tyvec','Macacão de pintor','Mangote raspa',
+          'Guarda corpo','Linha de vida móvel','Linha de vida fixa','Placas de sinalização','Isolamento de área','Tapume para solda',
+          'Tapete isolante','Coberturas isolantes','Conjunto ferramentas isoladas','Cones de sinalização','Fitas de sinalização',
+          'Escoramento','Tapumes','Talabarte de posicionamento','Outros'
+        ]},
+        {k:'medidas', titulo:'Medidas preventivas', ops:[
+          'Analisar o ambiente antes de iniciar o trabalho','Manter áreas sinalizadas ou isoladas','Informar pessoal da área e arredores',
+          'Colocar anteparos/tapumes','Manter escavação devidamente escorada/tapumes','Manter ferramentas em boas condições de conservação',
+          'Desenergizar as redes','Sinalizar equipamentos elétricos com cartões/cadeados/chaves','Trabalhador que realizará ligação/desligamento legalmente habilitado',
+          'Atender NR-10','Cuidados com parte elétrica, cabos e extensões','Utilizar iluminação à prova de explosão','Embalar/amarrar peças para transporte',
+          'Manter dispositivos de movimentação de material em condições adequadas','Afastar as mãos da zona de ação de equipamentos e ferramentas',
+          'Armazenar materiais e equipamentos adequadamente','Usar escada com pé de borracha/antiderrapante','Usar escadas de madeira ou fibra em bom estado',
+          'Prender escada extensível','No uso de maçarico, óculos com lente escura','Equipamento de solda com válvula contra retrocesso de chama',
+          'Manter fogo e faíscas afastados de inflamáveis','Acender somente com acendedor de maçarico','Manter cilindros de gás na vertical, amarrados, em local seguro',
+          'Acompanhamento de defesa interna em tempo integral','Condutor/operador de veículo habilitado','Dirigir em velocidade adequada às condições da via',
+          'Operador capacitado e treinado (com certificado)','Empregados treinados e habilitados para trabalhos em altura','Utilizar linha de vida',
+          'Manter seguro o transporte de ferramentas e materiais para o topo','Trabalho em altura externo: verificar condições climáticas favoráveis',
+          'Não ficar ou passar embaixo de cargas suspensas','Não movimentar andaime com pessoas em cima','Ancorar andaime sempre',
+          'Uso de guarda-corpo e rodapé no andaime','Andaimes com forração completa','Andaimes com rodas e elementos travados',
+          'Proteger líquidos inflamáveis e materiais combustíveis','Não utilizar PTA para instalações energizadas','Armazenar inflamável em local adequado'
+        ]}
+      ]
+    }
+  };
+
+  // ---- Estado ------------------------------------------------------------
+  let S = null; // estado do form aberto
+
+  // ---- Utilitários -------------------------------------------------------
+  function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstChild; }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function tecId(){ try{ return (typeof sessaoAtual!=='undefined' && sessaoAtual && (sessaoAtual.usuario_id||sessaoAtual.usuario_login)) || (typeof _mosState!=='undefined' && _mosState && _mosState.funcId) || ''; }catch(e){ return ''; } }
+  function tecNome(){ try{ return (typeof sessaoAtual!=='undefined' && sessaoAtual && sessaoAtual.usuario_nome) || (typeof _mosState!=='undefined' && _mosState && _mosState.funcNome) || ''; }catch(e){ return ''; } }
+  function say(m,t){ try{ toast(m,t); }catch(e){ /* fallback */ if(t==='err') alert(m); } }
+
+  // ---- Assinatura + trilha de evidência (validade jurídica de doc interno) ----
+  const ACEITE_VERSAO = 'aceite-v1';
+  const ACEITE_TXT = 'Declaro que realizei pessoalmente esta inspeção pré-operacional, que as informações e fotos aqui registradas são verdadeiras e, por este ato, assino eletronicamente o documento, reconhecendo sua validade (MP 2.200-2/2001, art. 10, §2).';
+  // canonicaliza (chaves ordenadas) p/ hash estável e reverificável pelo Hermes
+  function canon(o){ if(Array.isArray(o)) return '['+o.map(canon).join(',')+']'; if(o&&typeof o==='object'){ return '{'+Object.keys(o).sort().map(k=>JSON.stringify(k)+':'+canon(o[k])).join(',')+'}'; } return JSON.stringify(o===undefined?null:o); }
+  async function sha256(str){ try{ const b=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); }catch(e){ return null; } }
+  function assinaturaBloco(){
+    return '<div style="margin-top:14px;border-top:1px solid var(--b);padding-top:10px">'
+      +'<div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:3px">✍️ Assinatura do responsável <span style="color:var(--r)">*</span></div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:6px">Responsável pela inspeção: <strong>'+esc(tecNome()||('Téc. #'+(tecId()||'?')))+'</strong></div>'
+      +'<canvas id="ckl-assina" width="320" height="130" style="width:100%;background:#fff;border:1px solid var(--b2);border-radius:6px;touch-action:none;cursor:crosshair"></canvas>'
+      +'<div style="margin-top:6px"><button type="button" class="btn-sm btn-gray" data-assina-limpar>Limpar assinatura</button></div>'
+      +'<label style="display:flex;gap:8px;align-items:flex-start;font-size:11px;color:var(--tx);margin-top:9px;line-height:1.45;background:var(--bg3);border:1px solid var(--b);border-radius:7px;padding:9px"><input type="checkbox" data-aceite style="margin-top:2px"><span>'+esc(ACEITE_TXT)+'</span></label>'
+      +'</div>';
+  }
+  function wireAssinatura(ov){
+    const box=ov.querySelector('.ckl-box'); const cv=box.querySelector('#ckl-assina'); if(!cv) return;
+    const ctx=cv.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); ctx.lineWidth=2.2; ctx.strokeStyle='#111'; ctx.lineCap='round';
+    let draw=false,last=null;
+    const pos=(e)=>{ const r=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:(t.clientX-r.left)*(cv.width/r.width), y:(t.clientY-r.top)*(cv.height/r.height)}; };
+    const st=(e)=>{ draw=true; last=pos(e); e.preventDefault(); };
+    const mv=(e)=>{ if(!draw)return; const p=pos(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; S.assina.feito=true; S.assina.dataUrl=cv.toDataURL('image/png'); e.preventDefault(); };
+    const en=()=>{ draw=false; };
+    cv.onmousedown=st; cv.onmousemove=mv; cv.onmouseup=en; cv.onmouseleave=en; cv.ontouchstart=st; cv.ontouchmove=mv; cv.ontouchend=en;
+    const lim=box.querySelector('[data-assina-limpar]'); if(lim) lim.onclick=()=>{ ctx.fillStyle='#fff'; ctx.fillRect(0,0,cv.width,cv.height); S.assina={feito:false,dataUrl:null}; };
+    const ac=box.querySelector('[data-aceite]'); if(ac) ac.onchange=function(){ S.aceite=this.checked; };
+  }
+  // monta payload de assinatura (hash do conteúdo + evidência); null se inválido
+  async function montarAssinatura(conteudo){
+    const assinado_em=new Date().toISOString();
+    const base=Object.assign({}, conteudo, { assinado_em });
+    const hash=await sha256(canon(base));
+    return { assinado_em, hash, evidencia:{ assinado_em, user_agent:(navigator.userAgent||''), app_versao:APP_VER,
+      aceite:{ versao:ACEITE_VERSAO, texto:ACEITE_TXT, aceito:true },
+      tecnico_id:tecId(), tecnico_nome:tecNome() } };
+  }
+
+  // comprime/redimensiona a foto (resolução maior p/ enxergar dano) sem estourar o payload
+  function compress(file, maxDim, q){
+    return new Promise((res,rej)=>{
+      const fr=new FileReader();
+      fr.onload=()=>{ const img=new Image();
+        img.onload=()=>{ let w=img.naturalWidth||img.width, h=img.naturalHeight||img.height; const m=maxDim||1920;
+          if(w>m||h>m){ const s=Math.min(m/w,m/h); w=Math.round(w*s); h=Math.round(h*s); }
+          const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+          cv.getContext('2d').drawImage(img,0,0,w,h);
+          res({ dataUrl:cv.toDataURL('image/jpeg', q||0.78), w, h }); };
+        img.onerror=()=>rej(new Error('imagem inválida')); img.src=fr.result; };
+      fr.onerror=()=>rej(new Error('falha ao ler arquivo')); fr.readAsDataURL(file);
+    });
+  }
+
+  // ---- Grupo de fotos (múltiplas, com "+", SEM apagar depois de tirada) ----
+  // S.fotos é um mapa gid -> [ {dataUrl,w,h}, ... ].  gid ex.: 'obrig:lateral_esq', 'prob:3', 'entrega:frente'
+  function fgrupo(gid, label, obrig, dica, facing, btnTxt){
+    return '<div class="fgrupo" data-fg="'+gid+'" style="border:1px dashed var(--b2);border-radius:8px;padding:8px;margin-bottom:8px">'
+      +'<div style="font-size:11px;color:var(--tx);font-weight:600;margin-bottom:4px">'+esc(label)+(obrig?' <span style="color:var(--r)">*</span>':'')
+        +(dica?' <span style="color:var(--tx2);font-weight:400">'+esc(dica)+'</span>':'')+'</div>'
+      +'<div class="fthumbs" data-fthumbs="'+gid+'" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:5px"></div>'
+      +'<label style="display:inline-block;background:var(--acc3);color:var(--acc);font-size:11px;font-weight:600;padding:6px 10px;border-radius:5px;cursor:pointer">'+(btnTxt||'📷 Adicionar foto')+'<input type="file" accept="image/*" capture="'+(facing||'environment')+'" data-fadd="'+gid+'" style="display:none"></label>'
+      +'</div>';
+  }
+  function fthumb(dataUrl, n){
+    return '<div style="position:relative;width:62px;height:62px;border-radius:6px;overflow:hidden;border:1px solid var(--b2)">'
+      +'<img src="'+dataUrl+'" style="width:100%;height:100%;object-fit:cover">'
+      +'<span style="position:absolute;top:1px;right:2px;font-size:9px;color:#fff;background:rgba(0,0,0,.55);border-radius:3px;padding:0 3px">🔒'+n+'</span></div>';
+  }
+  function wireFotoGrupos(box){
+    box.querySelectorAll('[data-fadd]').forEach(inp=>inp.onchange=async function(){
+      const f=this.files&&this.files[0]; if(!f) return; const gid=this.getAttribute('data-fadd');
+      this.value=''; // nunca deixa "limpar": a foto entra e não sai
+      try{
+        const r=await compress(f);
+        (S.fotos[gid]||(S.fotos[gid]=[])).push(r);
+        const wrap=box.querySelector('[data-fthumbs="'+CSS.escape(gid)+'"]');
+        if(wrap) wrap.insertAdjacentHTML('beforeend', fthumb(r.dataUrl, S.fotos[gid].length));
+      }catch(e){ say('Falha na foto','err'); }
+    });
+  }
+  function fcount(gid){ return (S.fotos[gid]||[]).length; }
+
+  // ---- Overlay base ------------------------------------------------------
+  function overlay(inner, maxw){
+    const ov=document.createElement('div');
+    ov.className='ckl-ov';
+    ov.style.cssText='position:fixed;inset:0;z-index:650;background:rgba(0,0,0,.82);display:flex;align-items:flex-start;justify-content:center;padding:14px;overflow-y:auto;backdrop-filter:blur(3px)';
+    ov.innerHTML='<div class="ckl-box" style="background:var(--bg2);border:1px solid var(--b2);border-radius:var(--radius);padding:16px;width:100%;max-width:'+(maxw||480)+'px;margin:auto">'+inner+'</div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{ if(e.target===ov) {} }); // não fecha ao clicar fora (evita perder dados)
+    return ov;
+  }
+
+  // ---- Seletor de tipo ---------------------------------------------------
+  function abrirSeletor(){
+    const cards = Object.keys(CKL).map(tp=>{
+      const d=CKL[tp];
+      return '<button class="ckl-card" data-tp="'+tp+'" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--b);border-radius:9px;padding:13px;margin-bottom:8px;cursor:pointer;color:var(--tx)">'
+        +'<span style="font-size:26px;line-height:1">'+d.icone+'</span>'
+        +'<span style="flex:1"><span style="display:block;font-weight:700;font-size:14px;color:var(--tx)">'+esc(d.titulo)+'</span>'
+        +'<span style="font-size:11px;color:var(--tx2)">'+(d.especial?'Permissão de trabalho':((d.itens?d.itens.length:0)+' itens'))+(d.fotosObrig?' · '+d.fotosObrig.length+' fotos obrigatórias':'')+'</span></span>'
+        +'<span style="color:var(--acc);font-size:18px">›</span></button>';
+    }).join('');
+    const ov=overlay(
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><h3 style="font-family:var(--font-head);font-size:17px;color:var(--acc);flex:1">📋 Checklists diários</h3><button class="btn-sm btn-gray" data-x>✕</button></div>'
+      +'<div id="ckl-pendentes"></div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:12px">Selecione o checklist pré-operacional a preencher. Cada um é registrado separadamente.</div>'
+      +cards, 420);
+    ov.querySelector('[data-x]').onclick=()=>ov.remove();
+    ov.querySelectorAll('.ckl-card').forEach(b=>b.onclick=()=>{ ov.remove(); abrirForm(b.getAttribute('data-tp')); });
+    carregarPendentes(ov);
+  }
+
+  // ---- Pendentes de hoje (abertos de manhã, aguardando finalização) ------
+  async function carregarPendentes(ov){
+    const box=ov.querySelector('#ckl-pendentes'); if(!box) return;
+    const hoje=new Date(Date.now()-3*3600*1000).toISOString().slice(0,10);
+    let rows=[];
+    try{
+      const q={ acao:'listar', data_ref:hoje, status:'pendente' }; const tid=tecId(); if(tid) q.tecnico_id=tid;
+      const r=await fetch(WEBHOOK_CHECKLIST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(q)}).then(x=>x.json());
+      rows=(r&&r.ok&&r.checklists)||[];
+    }catch(e){ return; } // offline/sem backend: some seção
+    if(!rows.length){ box.innerHTML=''; return; }
+    box.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--y);margin-bottom:6px">⏳ Pendentes de hoje — finalizar no fim do dia</div>'
+      + rows.map(row=>{
+          const d=CKL[row.tipo]||{}; const idlbl=row.identificacao?(' · '+esc(row.identificacao)):'';
+          return '<button class="ckl-fin" data-fin="'+row.id+'" style="display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--y2);border:1px solid var(--y3);border-radius:9px;padding:11px;margin-bottom:8px;cursor:pointer;color:var(--tx)">'
+            +'<span style="font-size:20px">'+(d.icone||'📋')+'</span>'
+            +'<span style="flex:1"><span style="display:block;font-weight:700;font-size:13px">'+esc(d.titulo||row.tipo)+idlbl+'</span>'
+            +'<span style="font-size:11px;color:var(--y)">aberto hoje · toque para finalizar</span></span>'
+            +'<span style="color:var(--y);font-size:16px">✓</span></button>';
+        }).join('')
+      + '<div style="border-top:1px solid var(--b);margin:4px 0 12px"></div>';
+    box.querySelectorAll('.ckl-fin').forEach(b=>b.onclick=()=>{ const id=b.getAttribute('data-fin'); const row=rows.find(x=>String(x.id)===String(id)); ov.remove(); abrirFinalizar(row); });
+  }
+
+  // ---- Finalizar (fim do dia) --------------------------------------------
+  function abrirFinalizar(row){
+    if(!row) return; const d=CKL[row.tipo]||{};
+    S={ fotos:{} };
+    const fotosEntrega = (row.tipo==='veiculo' && d.fotosObrig) ? (
+      '<div style="margin-top:12px;border-top:1px solid var(--b);padding-top:10px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:3px">📷 Fotos de entrega <span style="color:var(--r)">*</span></div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Fotografe o veículo na devolução — prova de que voltou como saiu de manhã. As mesmas 5 faces (pode tirar mais de uma; não dá pra apagar).</div>'
+      + d.fotosObrig.map(f=> fgrupo('entrega:'+f.slot, f.label, true)).join('')
+      + (d.selfie ? fgrupo('entrega_selfie:'+d.selfie.slot, '🤳 '+d.selfie.label, true, '(na devolução — câmera frontal)', 'user', '🤳 Tirar selfie') : '')
+      +'</div>'
+    ) : '';
+    const campos = (row.tipo==='veiculo')
+      ? '<label style="display:block;font-size:12px;color:var(--tx);font-weight:600;margin-bottom:2px">KM final <span style="color:var(--r)">*</span></label>'
+        +'<input id="fin-km" type="number" inputmode="numeric" style="width:100%;padding:9px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:14px">'
+        +(row.km_inicial!=null?'<div style="font-size:11px;color:var(--tx2);margin-top:3px">KM inicial registrado: <strong>'+esc(row.km_inicial)+'</strong></div>':'')
+      : '<div style="display:flex;gap:8px"><div style="flex:1"><label style="display:block;font-size:12px;color:var(--tx);font-weight:600;margin-bottom:2px">Data final <span style="color:var(--r)">*</span></label><input id="fin-data" type="date" style="width:100%;padding:9px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx)"></div>'
+        +'<div style="flex:1"><label style="display:block;font-size:12px;color:var(--tx);font-weight:600;margin-bottom:2px">Hora final</label><input id="fin-hora" type="time" style="width:100%;padding:9px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx)"></div></div>';
+    const ov=overlay(
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:22px">'+(d.icone||'📋')+'</span><h3 style="font-family:var(--font-head);font-size:16px;color:var(--acc);flex:1">Finalizar — '+esc(d.titulo||row.tipo)+'</h3><button class="btn-sm btn-gray" data-x>✕</button></div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:10px">'+(row.identificacao?('Identificação: <strong>'+esc(row.identificacao)+'</strong> · '):'')+'Aberto hoje. Informe o fechamento do dia.</div>'
+      + campos
+      + fotosEntrega
+      +'<label style="display:block;font-size:12px;color:var(--tx);font-weight:600;margin:10px 0 2px">Observações finais</label>'
+      +'<textarea id="fin-obs" rows="2" style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:12px;font-family:inherit" placeholder="opcional"></textarea>'
+      +'<div id="fin-msg" style="font-size:11px;color:var(--r);min-height:14px;margin:8px 0 4px"></div>'
+      +'<div style="display:flex;gap:8px"><button class="btn-sm btn-gray" data-x2 style="flex:1">Cancelar</button><button class="btn-sm btn-green" data-ok style="flex:2">✓ Finalizar</button></div>', 420);
+    ov.querySelector('[data-x]').onclick=()=>ov.remove();
+    ov.querySelector('[data-x2]').onclick=()=>ov.remove();
+    wireFotoGrupos(ov.querySelector('.ckl-box'));
+    ov.querySelector('[data-ok]').onclick=async function(){
+      const msg=ov.querySelector('#fin-msg'); msg.style.color='var(--r)';
+      const payload={ acao:'finalizar', id:row.id, observacoes:(ov.querySelector('#fin-obs').value||'') };
+      if(row.tipo==='veiculo'){
+        const km=ov.querySelector('#fin-km').value; if(!String(km).trim()){ msg.textContent='Informe o KM final'; return; } payload.km_final=km;
+        for(const f of (d.fotosObrig||[])){ if(fcount('entrega:'+f.slot)<1){ msg.textContent='Falta a foto de entrega: '+f.label; return; } }
+        if(d.selfie && fcount('entrega_selfie:'+d.selfie.slot)<1){ msg.textContent='Falta a selfie do colaborador na devolução.'; return; }
+        const fotos=[]; (d.fotosObrig||[]).forEach(f=>{ (S.fotos['entrega:'+f.slot]||[]).forEach(p=>fotos.push({categoria:'obrigatoria',momento:'entrega',slot:f.slot,item_label:f.label,dataUrl:p.dataUrl,largura:p.w,altura:p.h})); });
+        if(d.selfie) (S.fotos['entrega_selfie:'+d.selfie.slot]||[]).forEach(p=>fotos.push({categoria:'selfie',momento:'entrega',slot:'selfie',item_label:d.selfie.label,dataUrl:p.dataUrl,largura:p.w,altura:p.h}));
+        payload.fotos=fotos;
+      } else { const dt=ov.querySelector('#fin-data').value; if(!dt){ msg.textContent='Informe a data final'; return; } payload.data_final=dt; payload.hora_final=ov.querySelector('#fin-hora').value||''; }
+      this.disabled=true; const o=this.textContent; this.textContent='⏳...'; msg.style.color='var(--tx2)'; msg.textContent='Enviando'+(payload.fotos?' '+payload.fotos.length+' foto(s)':'')+'...';
+      try{ const r=await fetch(WEBHOOK_CHECKLIST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(x=>x.json());
+        if(r&&r.ok){ say('Checklist finalizado ✓','ok'); ov.remove(); }
+        else { msg.style.color='var(--r)'; msg.textContent='Erro: '+((r&&r.erro)||'falhou'); this.disabled=false; this.textContent=o; }
+      }catch(e){ msg.style.color='var(--r)'; msg.textContent='Falha de rede: '+e.message; this.disabled=false; this.textContent=o; }
+    };
+  }
+
+  // ---- Form por tipo -----------------------------------------------------
+  function abrirForm(tipo){
+    const d=CKL[tipo]; if(!d) return;
+    S={ tipo, header:{}, resp:{}, probObs:{}, fotos:{}, pt:{atividade:[],maodeobra:[],perigos:[],epis:[],medidas:[],simnao:{}}, descricao:'', obs:'', assina:{feito:false,dataUrl:null}, aceite:false };
+    const ov = d.especial ? renderPT(d) : renderPadrao(tipo,d);
+    document.body.appendChild(ov);
+  }
+
+  function campoInput(c){
+    const t=c.tipo||'text';
+    return '<label style="display:block;font-size:11px;color:var(--tx2);margin:6px 0 2px">'+esc(c.label)+(c.req?' <span style="color:var(--r)">*</span>':'')+(c.hint?' <span style="color:var(--y)">· '+esc(c.hint)+'</span>':'')+'</label>'
+      +'<input data-hk="'+c.k+'" type="'+t+'" '+(t==='number'?'inputmode="numeric"':'')+' style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:13px">';
+  }
+
+  // ---- Form padrão (veiculo/escada/cinto/furadeira) ----------------------
+  function renderPadrao(tipo,d){
+    const hdr = d.header.map(campoInput).join('');
+    const fotosObrig = d.fotosObrig ? (
+      '<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">📷 Fotos obrigatórias <span style="color:var(--r)">*</span></div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Registre as 5 faces. Pode tirar <strong>mais de uma por face</strong> (carro grande, aproxime pra pegar o detalhe). A foto tirada <strong>não pode ser apagada</strong>.</div>'
+      + d.fotosObrig.map(f=> fgrupo('obrig:'+f.slot, f.label, true, (f.slot==='lateral_esq'||f.slot==='lateral_dir')?'(use o "+" p/ frente e traseira da lateral)':'')).join('')
+      +'</div>'
+    ) : '';
+    // selfie do colaborador (prova de presença) — em TODOS os tipos
+    const selfieB = d.selfie ? ('<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">🤳 Selfie <span style="color:var(--r)">*</span></div>'
+      + fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — câmera frontal)', 'user', '🤳 Tirar selfie') + '</div>') : '';
+
+    const itens = d.itens.map((q,i)=>{
+      const id=i+1;
+      return '<div class="ckl-item" data-item="'+id+'" style="border-top:1px solid var(--b);padding:10px 0">'
+        +'<div style="font-size:12.5px;color:var(--tx);line-height:1.45;margin-bottom:7px"><strong style="color:var(--acc)">'+id+'.</strong> '+esc(q)+'</div>'
+        +'<div class="ckl-opts" style="display:flex;gap:6px">'
+          +optBtn(id,'sim','Sim','var(--g)')+optBtn(id,'nao','Não','var(--r)')+optBtn(id,'na','N/A','var(--tx3)')
+        +'</div>'
+        +'<div class="ckl-prob" data-prob="'+id+'" style="display:none;margin-top:8px;background:var(--r2);border:1px solid var(--r3);border-radius:7px;padding:9px">'
+          +'<div style="font-size:11px;color:var(--r);font-weight:700;margin-bottom:6px">⚠ Problema identificado — foto obrigatória (pode anexar várias com o "+")</div>'
+          + fgrupo('prob:'+id, 'Fotos do problema', true)
+          +'<input data-probobs="'+id+'" type="text" placeholder="descreva o problema (opcional)" style="width:100%;margin-top:3px;padding:7px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:12px">'
+        +'</div>'
+      +'</div>';
+    }).join('');
+
+    const inner =
+      head(d,tipo)
+      + '<div style="font-weight:700;font-size:12px;color:var(--tx);margin:6px 0 2px">Dados</div>'
+      + hdr
+      + fotosObrig
+      + selfieB
+      + '<div style="margin-top:14px;font-weight:700;font-size:13px;color:var(--tx)">Itens de verificação</div>'
+      + '<div style="font-size:11px;color:var(--tx2);margin-bottom:2px">Qualquer "Não" bloqueia o uso até avaliação da Segurança do Trabalho e exige foto.</div>'
+      + itens
+      + obsBloco()
+      + assinaturaBloco()
+      + footer();
+
+    const ov=overlay(inner, 480);
+    wirePadrao(ov,tipo,d);
+    return ov;
+  }
+
+  function head(d,tipo){
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'
+      +'<span style="font-size:24px">'+d.icone+'</span>'
+      +'<h3 style="font-family:var(--font-head);font-size:16px;color:var(--acc);flex:1">'+esc(d.titulo)+'</h3>'
+      +'<button class="btn-sm btn-gray" data-x>✕</button></div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Periodicidade: diária · Técnico: <strong>'+esc(tecNome()||('#'+(tecId()||'?')))+'</strong></div>';
+  }
+  function optBtn(id,val,txt,cor){
+    return '<button type="button" class="ckl-opt" data-r="'+id+'" data-v="'+val+'" style="flex:1;padding:8px 0;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx2);font-size:12px;font-weight:600;cursor:pointer" data-cor="'+cor+'">'+txt+'</button>';
+  }
+  function obsBloco(){
+    return '<div style="margin-top:14px"><label style="font-size:12px;color:var(--tx);font-weight:600">Observações / recomendações</label>'
+      +'<textarea data-obs rows="2" style="width:100%;margin-top:4px;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:12px;font-family:inherit" placeholder="opcional"></textarea></div>';
+  }
+  function footer(){
+    return '<div id="ckl-msg" style="font-size:11px;color:var(--r);min-height:14px;margin:10px 0 4px"></div>'
+      +'<div style="display:flex;gap:8px"><button class="btn-sm btn-gray" data-cancel style="flex:1">Cancelar</button>'
+      +'<button class="btn-sm btn-green" data-enviar style="flex:2">✓ Enviar checklist</button></div>';
+  }
+
+  function setPrev(container, sel, dataUrl){
+    const box=container.querySelector(sel); if(!box) return;
+    box.style.display='flex';
+    box.innerHTML='<img src="'+dataUrl+'" style="width:100%;height:100%;max-height:120px;object-fit:cover;border-radius:6px">';
+  }
+
+  function wirePadrao(ov,tipo,d){
+    const box=ov.querySelector('.ckl-box');
+    ov.querySelector('[data-x]').onclick=()=>confirmClose(ov);
+    ov.querySelector('[data-cancel]').onclick=()=>confirmClose(ov);
+    // header inputs
+    box.querySelectorAll('[data-hk]').forEach(inp=>inp.oninput=()=>{ S.header[inp.getAttribute('data-hk')]=inp.value; });
+    box.querySelector('[data-obs]').oninput=function(){ S.obs=this.value; };
+    // opção sim/nao/na
+    box.querySelectorAll('.ckl-opt').forEach(b=>b.onclick=function(){
+      const id=this.getAttribute('data-r'), v=this.getAttribute('data-v');
+      S.resp[id]=v;
+      // visual
+      this.parentNode.querySelectorAll('.ckl-opt').forEach(x=>{ x.style.background='var(--bg)'; x.style.color='var(--tx2)'; x.style.borderColor='var(--b2)'; });
+      this.style.background=this.getAttribute('data-cor'); this.style.color='#001018'; this.style.borderColor=this.getAttribute('data-cor');
+      const prob=box.querySelector('[data-prob="'+id+'"]');
+      if(prob) prob.style.display = (v==='nao')?'block':'none';
+      if(v!=='nao'){ delete S.fotos['prob:'+id]; const tw=box.querySelector('[data-fthumbs="prob:'+id+'"]'); if(tw) tw.innerHTML=''; }
+    });
+    wireFotoGrupos(box);
+    box.querySelectorAll('[data-probobs]').forEach(inp=>inp.oninput=function(){ S.probObs[this.getAttribute('data-probobs')]=this.value; });
+    wireAssinatura(ov);
+    // enviar
+    ov.querySelector('[data-enviar]').onclick=()=>enviarPadrao(ov,tipo,d);
+  }
+
+  async function enviarPadrao(ov,tipo,d){
+    const box=ov.querySelector('.ckl-box'); const msg=box.querySelector('#ckl-msg');
+    const fail=(t)=>{ msg.style.color='var(--r)'; msg.textContent=t; msg.scrollIntoView&&msg.scrollIntoView({block:'center'}); };
+    // ident obrigatório
+    const identCampo=(d.header.find(h=>h.req)||{}).k;
+    if(identCampo && !String(S.header[identCampo]||'').trim()) return fail('Preencha: '+(d.header.find(h=>h.req).label));
+    // todos itens respondidos
+    for(let i=1;i<=d.itens.length;i++){ if(!S.resp[i]) return fail('Responda o item '+i+' ('+d.itens[i-1].slice(0,40)+'…)'); }
+    // fotos obrigatórias (>=1 por face)
+    if(d.fotosObrig){ for(const f of d.fotosObrig){ if(fcount('obrig:'+f.slot)<1) return fail('Falta a foto obrigatória: '+f.label); } }
+    // selfie do colaborador com o veículo (prova de presença)
+    if(d.selfie && fcount('selfie:'+d.selfie.slot)<1) return fail('Falta a selfie do colaborador com o veículo.');
+    // >=1 foto p/ cada "não"
+    for(let i=1;i<=d.itens.length;i++){ if(S.resp[i]==='nao' && fcount('prob:'+i)<1) return fail('Item '+i+' marcado "Não": registre a foto do problema.'); }
+    // assinatura + aceite
+    if(!S.assina||!S.assina.feito||!S.assina.dataUrl) return fail('Assine no campo de assinatura.');
+    if(!S.aceite) return fail('Marque o termo de aceite para assinar.');
+
+    const respostas=d.itens.map((q,i)=>{ const id=i+1; return {id, pergunta:q, resposta:S.resp[id], obs:S.probObs[id]||''}; });
+    const identificacao=String(S.header[d.ident]||'').trim();
+    const assin=await montarAssinatura({ tipo, identificacao, cabecalho:S.header, respostas, observacoes:S.obs||'' });
+    const fotos=[];
+    if(d.fotosObrig) d.fotosObrig.forEach(f=>{ (S.fotos['obrig:'+f.slot]||[]).forEach(p=>fotos.push({categoria:'obrigatoria',momento:'abertura',slot:f.slot,item_label:f.label,dataUrl:p.dataUrl,largura:p.w,altura:p.h})); });
+    if(d.selfie) (S.fotos['selfie:'+d.selfie.slot]||[]).forEach(p=>fotos.push({categoria:'selfie',momento:'abertura',slot:'selfie',item_label:d.selfie.label,dataUrl:p.dataUrl,largura:p.w,altura:p.h}));
+    d.itens.forEach((q,i)=>{ const id=i+1; (S.fotos['prob:'+id]||[]).forEach(p=>fotos.push({categoria:'problema',slot:'problema',item_id:String(id),item_label:q,dataUrl:p.dataUrl,largura:p.w,altura:p.h})); });
+    fotos.push({categoria:'assinatura',slot:'responsavel',item_label:'Assinatura do responsável',dataUrl:S.assina.dataUrl});
+
+    const payload={ acao:'enviar', tipo, tecnico_id:tecId(), tecnico_nome:tecNome(),
+      local:S.header.local||'', identificacao,
+      km_inicial:S.header.km_inicial||null, km_final:S.header.km_final||null,
+      cabecalho:S.header, respostas, observacoes:S.obs||'', app_versao:APP_VER,
+      assinatura_hash:assin.hash, assinatura_evidencia:assin.evidencia, fotos };
+    submit(ov,box,payload);
+  }
+
+  // ---- Form PT -----------------------------------------------------------
+  function renderPT(d){
+    const campos=d.campos.map(campoInput).join('');
+    const chkGroup=(arr,key,cols)=> '<div style="display:grid;grid-template-columns:repeat('+(cols||1)+',1fr);gap:4px 10px">'
+      + arr.map((o,i)=>'<label style="display:flex;align-items:flex-start;gap:6px;font-size:12px;color:var(--tx);line-height:1.35"><input type="checkbox" data-grp="'+key+'" value="'+esc(o)+'" style="margin-top:2px">'+esc(o)+'</label>').join('')
+      + '</div>';
+    const grupos=d.grupos.map(g=>
+      '<details style="margin-top:10px;border:1px solid var(--b);border-radius:8px;padding:8px 10px"><summary style="font-weight:700;font-size:13px;color:var(--acc);cursor:pointer">'+esc(g.titulo)+' <span data-cnt="'+g.k+'" style="color:var(--tx2);font-weight:400">(0)</span></summary><div style="margin-top:8px">'+chkGroup(g.ops,g.k,1)+'</div></details>'
+    ).join('');
+    const simnao=d.simnao.map(s=>
+      '<div style="display:flex;align-items:center;gap:10px;margin-top:6px"><span style="flex:1;font-size:12px;color:var(--tx)">'+esc(s.label)+'</span>'
+      +'<button type="button" class="pt-sn" data-sn="'+s.k+'" data-v="sim" style="padding:5px 12px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx2);font-size:12px;cursor:pointer">Sim</button>'
+      +'<button type="button" class="pt-sn" data-sn="'+s.k+'" data-v="nao" style="padding:5px 12px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx2);font-size:12px;cursor:pointer">Não</button></div>'
+    ).join('');
+    const inner=
+      head(d,'pt')
+      +'<div style="font-weight:700;font-size:12px;color:var(--tx);margin:6px 0 2px">Identificação da atividade</div>'
+      + chkGroup(d.atividade,'atividade',1)
+      +'<div style="font-weight:700;font-size:12px;color:var(--tx);margin:12px 0 2px">Mão-de-obra</div>'
+      + chkGroup(d.maodeobra,'maodeobra',3)
+      + simnao
+      +'<div style="font-weight:700;font-size:12px;color:var(--tx);margin:12px 0 2px">Dados</div>'
+      + campos
+      +'<label style="display:block;font-size:11px;color:var(--tx2);margin:6px 0 2px">Descrição do trabalho</label>'
+      +'<textarea data-descricao rows="2" style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:12px;font-family:inherit"></textarea>'
+      + grupos
+      + (d.selfie ? ('<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">🤳 Selfie <span style="color:var(--r)">*</span></div>'+fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — câmera frontal)', 'user', '🤳 Tirar selfie')+'</div>') : '')
+      +'<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">📷 Fotos (opcional)</div>'
+        +'<div class="pt-fotos" style="display:flex;gap:6px;flex-wrap:wrap"></div>'
+        +'<label style="display:inline-block;margin-top:6px;background:var(--acc3);color:var(--acc);font-size:11px;font-weight:600;padding:6px 10px;border-radius:5px;cursor:pointer">+ Adicionar foto<input type="file" accept="image/*" capture="environment" data-ptfoto style="display:none"></label></div>'
+      + obsBloco()
+      + assinaturaBloco()
+      + footer();
+    const ov=overlay(inner, 520);
+    wirePT(ov,d);
+    return ov;
+  }
+
+  function wirePT(ov,d){
+    const box=ov.querySelector('.ckl-box');
+    S.ptFotos=[];
+    ov.querySelector('[data-x]').onclick=()=>confirmClose(ov);
+    ov.querySelector('[data-cancel]').onclick=()=>confirmClose(ov);
+    box.querySelectorAll('[data-hk]').forEach(inp=>inp.oninput=()=>{ S.header[inp.getAttribute('data-hk')]=inp.value; });
+    box.querySelector('[data-descricao]').oninput=function(){ S.descricao=this.value; };
+    box.querySelector('[data-obs]').oninput=function(){ S.obs=this.value; };
+    box.querySelectorAll('[data-grp]').forEach(c=>c.onchange=function(){
+      const g=this.getAttribute('data-grp'); const arr=S.pt[g]||(S.pt[g]=[]);
+      if(this.checked){ if(arr.indexOf(this.value)<0) arr.push(this.value); }
+      else { const k=arr.indexOf(this.value); if(k>=0) arr.splice(k,1); }
+      const cnt=box.querySelector('[data-cnt="'+g+'"]'); if(cnt) cnt.textContent='('+arr.length+')';
+    });
+    box.querySelectorAll('.pt-sn').forEach(b=>b.onclick=function(){
+      const k=this.getAttribute('data-sn'), v=this.getAttribute('data-v');
+      S.pt.simnao[k]=v;
+      this.parentNode.querySelectorAll('.pt-sn[data-sn="'+k+'"]').forEach(x=>{ x.style.background='var(--bg)'; x.style.color='var(--tx2)'; });
+      this.style.background=(v==='sim')?'var(--g)':'var(--r)'; this.style.color='#001018';
+    });
+    box.querySelector('[data-ptfoto]').onchange=async function(){
+      const f=this.files&&this.files[0]; if(!f) return;
+      try{ const r=await compress(f); S.ptFotos.push(r);
+        const wrap=box.querySelector('.pt-fotos');
+        wrap.appendChild(el('<div style="width:60px;height:60px;border-radius:6px;overflow:hidden;border:1px solid var(--b2)"><img src="'+r.dataUrl+'" style="width:100%;height:100%;object-fit:cover"></div>'));
+      }catch(e){ say('Falha na foto','err'); }
+      this.value='';
+    };
+    wireFotoGrupos(box);
+    wireAssinatura(ov);
+    ov.querySelector('[data-enviar]').onclick=()=>enviarPT(ov,d);
+  }
+
+  async function enviarPT(ov,d){
+    const box=ov.querySelector('.ckl-box'); const msg=box.querySelector('#ckl-msg');
+    const fail=(t)=>{ msg.style.color='var(--r)'; msg.textContent=t; };
+    if(!String(S.header.local||'').trim()) return fail('Preencha: Local de trabalho');
+    if(d.selfie && fcount('selfie:'+d.selfie.slot)<1) return fail('Falta a selfie do colaborador no local.');
+    if(!S.assina||!S.assina.feito||!S.assina.dataUrl) return fail('Assine no campo de assinatura.');
+    if(!S.aceite) return fail('Marque o termo de aceite para assinar.');
+    const cabecalho=Object.assign({}, S.header, {
+      atividade:S.pt.atividade, maodeobra:S.pt.maodeobra, simnao:S.pt.simnao,
+      perigos:S.pt.perigos, epis:S.pt.epis, medidas:S.pt.medidas, descricao:S.descricao||''
+    });
+    const identificacao=String(S.header.local||'').trim();
+    const assin=await montarAssinatura({ tipo:'pt', identificacao, cabecalho, respostas:[], observacoes:S.obs||'' });
+    const fotos=(S.ptFotos||[]).map((p,i)=>({categoria:'anexo',slot:'pt',item_id:String(i),item_label:'Anexo PT',dataUrl:p.dataUrl,largura:p.w,altura:p.h}));
+    if(d.selfie) (S.fotos['selfie:'+d.selfie.slot]||[]).forEach(p=>fotos.push({categoria:'selfie',momento:'abertura',slot:'selfie',item_label:d.selfie.label,dataUrl:p.dataUrl,largura:p.w,altura:p.h}));
+    fotos.push({categoria:'assinatura',slot:'responsavel',item_label:'Assinatura do responsável',dataUrl:S.assina.dataUrl});
+    const payload={ acao:'enviar', tipo:'pt', tecnico_id:tecId(), tecnico_nome:tecNome(),
+      local:S.header.local||'', identificacao,
+      cabecalho, respostas:[], observacoes:S.obs||'', app_versao:APP_VER,
+      assinatura_hash:assin.hash, assinatura_evidencia:assin.evidencia, fotos };
+    submit(ov,box,payload);
+  }
+
+  // ---- Envio comum -------------------------------------------------------
+  async function submit(ov,box,payload){
+    const btn=ov.querySelector('[data-enviar]'); const msg=box.querySelector('#ckl-msg');
+    btn.disabled=true; const orig=btn.textContent; btn.textContent='⏳ Enviando...'; msg.style.color='var(--tx2)'; msg.textContent='Enviando '+(payload.fotos?payload.fotos.length:0)+' foto(s)...';
+    // geo (best-effort, não bloqueia)
+    try{ const pos=await new Promise((res)=>{ if(!navigator.geolocation) return res(null); navigator.geolocation.getCurrentPosition(p=>res(p),()=>res(null),{timeout:4000,maximumAge:60000}); });
+      if(pos) payload.geo={lat:pos.coords.latitude,lng:pos.coords.longitude}; }catch(e){}
+    try{
+      const r=await fetch(WEBHOOK_CHECKLIST,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(x=>x.json());
+      if(r&&r.ok){
+        const pend = (r.status==='pendente');
+        say((pend?'Checklist aberto ✓ — finalize no fim do dia':'Checklist enviado ✓')+(r.tem_problema?(' · '+r.qtd_problemas+' problema(s)'):''),'ok');
+        ov.remove();
+      } else { msg.style.color='var(--r)'; msg.textContent='Erro: '+((r&&r.erro)||'resposta inválida'); btn.disabled=false; btn.textContent=orig; }
+    }catch(e){ msg.style.color='var(--r)'; msg.textContent='Falha de rede: '+e.message; btn.disabled=false; btn.textContent=orig; }
+  }
+
+  function confirmClose(ov){
+    const temDados = S && (Object.keys(S.resp||{}).length || Object.keys(S.header||{}).some(k=>S.header[k]) || (S.ptFotos&&S.ptFotos.length));
+    if(temDados && !confirm('Descartar este checklist? Os dados preenchidos serão perdidos.')) return;
+    ov.remove();
+  }
+
+  // ---- Botão na barra de sessão ------------------------------------------
+  function montarBotao(){
+    const bar=document.getElementById('sessao-bar'); if(!bar) return;
+    if(document.getElementById('btn-checklist')) return;
+    const b=document.createElement('button');
+    b.className='btn-sess'; b.id='btn-checklist'; b.title='Checklists pré-operacionais'; b.textContent='📋 Checklists';
+    const ref=document.getElementById('btn-config')||document.getElementById('btn-tema');
+    bar.insertBefore(b, ref||null);
+    b.addEventListener('click', abrirSeletor);
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',montarBotao); else montarBotao();
+  // reidrata o botão caso a barra seja recriada no login
+  const _mo=new MutationObserver(()=>{ if(document.getElementById('sessao-bar') && !document.getElementById('btn-checklist')) montarBotao(); });
+  try{ _mo.observe(document.body,{childList:true,subtree:true}); }catch(e){}
+
+  window.abrirChecklists = abrirSeletor;
 })();
