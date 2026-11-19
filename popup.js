@@ -3634,6 +3634,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   function tecId(){ try{ return (typeof sessaoAtual!=='undefined' && sessaoAtual && (sessaoAtual.usuario_id||sessaoAtual.usuario_login)) || (typeof _mosState!=='undefined' && _mosState && _mosState.funcId) || ''; }catch(e){ return ''; } }
   function tecNome(){ try{ return (typeof sessaoAtual!=='undefined' && sessaoAtual && sessaoAtual.usuario_nome) || (typeof _mosState!=='undefined' && _mosState && _mosState.funcNome) || ''; }catch(e){ return ''; } }
+  function tecSetor(){ try{ return (typeof sessaoAtual!=='undefined' && sessaoAtual && sessaoAtual.tecnico_setor) || ''; }catch(e){ return ''; } }
   function say(m,t){ try{ toast(m,t); }catch(e){ /* fallback */ if(t==='err') alert(m); } }
 
   // ---- Assinatura + trilha de evidência (validade jurídica de doc interno) ----
@@ -3958,7 +3959,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     d.itens.forEach((q,i)=>{ const id=i+1; (S.fotos['prob:'+id]||[]).forEach(p=>fotos.push({categoria:'problema',slot:'problema',item_id:String(id),item_label:q,dataUrl:p.dataUrl,largura:p.w,altura:p.h})); });
     fotos.push({categoria:'assinatura',slot:'responsavel',item_label:'Assinatura do responsável',dataUrl:S.assina.dataUrl});
 
-    const payload={ acao:'enviar', tipo, tecnico_id:tecId(), tecnico_nome:tecNome(),
+    const payload={ acao:'enviar', tipo, tecnico_id:tecId(), tecnico_nome:tecNome(), tecnico_setor:tecSetor(),
       local:S.header.local||'', identificacao,
       km_inicial:S.header.km_inicial||null, km_final:S.header.km_final||null,
       cabecalho:S.header, respostas, observacoes:S.obs||'', app_versao:APP_VER,
@@ -4053,7 +4054,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     const fotos=(S.ptFotos||[]).map((p,i)=>({categoria:'anexo',slot:'pt',item_id:String(i),item_label:'Anexo PT',dataUrl:p.dataUrl,largura:p.w,altura:p.h}));
     if(d.selfie) (S.fotos['selfie:'+d.selfie.slot]||[]).forEach(p=>fotos.push({categoria:'selfie',momento:'abertura',slot:'selfie',item_label:d.selfie.label,dataUrl:p.dataUrl,largura:p.w,altura:p.h}));
     fotos.push({categoria:'assinatura',slot:'responsavel',item_label:'Assinatura do responsável',dataUrl:S.assina.dataUrl});
-    const payload={ acao:'enviar', tipo:'pt', tecnico_id:tecId(), tecnico_nome:tecNome(),
+    const payload={ acao:'enviar', tipo:'pt', tecnico_id:tecId(), tecnico_nome:tecNome(), tecnico_setor:tecSetor(),
       local:S.header.local||'', identificacao,
       cabecalho, respostas:[], observacoes:S.obs||'', app_versao:APP_VER,
       assinatura_hash:assin.hash, assinatura_evidencia:assin.evidencia, fotos };

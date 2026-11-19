@@ -62,6 +62,8 @@ async function fazerLogin(login, senha) {
     usuario_nome:  data.usuario_nome,
     usuario_login: data.usuario_login,
     usuario_email: data.usuario_email || '',
+    // setor do colaborador (resolvido no login a partir do funcionário IXC) — p/ filtro do BI
+    tecnico_setor: data.tecnico_setor || data.setor || data.nome_setor || null,
     // Grupo de usuário do IXC (1 = técnico, 2 = atendente) — usado no filtro da Gestão
     id_grupo:      data.id_grupo ?? data.grupo_id ?? data.id_grupo_usuario ?? null,
     token:         data.token,
