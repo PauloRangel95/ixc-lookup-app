@@ -3651,7 +3651,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       +'<div style="font-size:11px;color:var(--tx);font-weight:600;margin-bottom:4px">'+esc(label)+(obrig?' <span style="color:var(--r)">*</span>':'')
         +(dica?' <span style="color:var(--tx2);font-weight:400">'+esc(dica)+'</span>':'')+'</div>'
       +'<div class="fthumbs" data-fthumbs="'+gid+'" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:5px"></div>'
-      +'<label style="display:inline-block;background:var(--acc3);color:var(--acc);font-size:11px;font-weight:600;padding:6px 10px;border-radius:5px;cursor:pointer">'+(btnTxt||'📷 Adicionar foto')+'<input type="file" accept="image/*" capture="'+(facing||'environment')+'" data-fadd="'+gid+'" style="display:none"></label>'
+      +'<label style="display:inline-block;background:var(--acc3);color:var(--acc);font-size:11px;font-weight:600;padding:6px 10px;border-radius:5px;cursor:pointer">'+(btnTxt||'📷 Adicionar foto')+'<input type="file" accept="image/*"'+(facing==='livre'?'':' capture="'+(facing||'environment')+'"')+' data-fadd="'+gid+'" style="display:none"></label>'
       +'</div>';
   }
   function fthumb(dataUrl, n){
@@ -3736,7 +3736,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       '<div style="margin-top:12px;border-top:1px solid var(--b);padding-top:10px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:3px">📷 Fotos de entrega <span style="color:var(--r)">*</span></div>'
       +'<div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Fotografe o veículo na devolução — prova de que voltou como saiu de manhã. As mesmas 5 faces (pode tirar mais de uma; não dá pra apagar).</div>'
       + d.fotosObrig.map(f=> fgrupo('entrega:'+f.slot, f.label, true)).join('')
-      + (d.selfie ? fgrupo('entrega_selfie:'+d.selfie.slot, '🤳 '+d.selfie.label, true, '(na devolução — câmera frontal)', 'user', '🤳 Tirar selfie') : '')
+      + (d.selfie ? fgrupo('entrega_selfie:'+d.selfie.slot, '🤳 '+d.selfie.label, true, '(na devolução — frente ou traseira)', 'livre', '🤳 Tirar selfie') : '')
       +'</div>'
     ) : '';
     const campos = (row.tipo==='veiculo')
@@ -3801,7 +3801,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     ) : '';
     // selfie do colaborador (prova de presença) — em TODOS os tipos
     const selfieB = d.selfie ? ('<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">🤳 Selfie <span style="color:var(--r)">*</span></div>'
-      + fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — câmera frontal)', 'user', '🤳 Tirar selfie') + '</div>') : '';
+      + fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — frente ou traseira)', 'livre', '🤳 Tirar selfie') + '</div>') : '';
 
     const itens = d.itens.map((q,i)=>{
       const id=i+1;
@@ -3948,7 +3948,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       +'<label style="display:block;font-size:11px;color:var(--tx2);margin:6px 0 2px">Descrição do trabalho</label>'
       +'<textarea data-descricao rows="2" style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:12px;font-family:inherit"></textarea>'
       + grupos
-      + (d.selfie ? ('<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">🤳 Selfie <span style="color:var(--r)">*</span></div>'+fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — câmera frontal)', 'user', '🤳 Tirar selfie')+'</div>') : '')
+      + (d.selfie ? ('<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">🤳 Selfie <span style="color:var(--r)">*</span></div>'+fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — frente ou traseira)', 'livre', '🤳 Tirar selfie')+'</div>') : '')
       +'<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">📷 Fotos (opcional)</div>'
         +'<div class="pt-fotos" style="display:flex;gap:6px;flex-wrap:wrap"></div>'
         +'<label style="display:inline-block;margin-top:6px;background:var(--acc3);color:var(--acc);font-size:11px;font-weight:600;padding:6px 10px;border-radius:5px;cursor:pointer">+ Adicionar foto<input type="file" accept="image/*" capture="environment" data-ptfoto style="display:none"></label></div>'
