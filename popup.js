@@ -3418,7 +3418,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   // ---- Definições dos checklists -----------------------------------------
   const CKL = {
     veiculo: {
-      titulo:'Veículo Leve', icone:'🚗', ident:'placa', identLabel:'Placa',
+      titulo:'Veículo Leve', icone:'🚗', ident:'placa', identLabel:'Placa', finalizaKm:true,
       header:[
         {k:'placa',       label:'Placa',        req:true},
         {k:'carro',       label:'Carro / Modelo'},
@@ -3454,6 +3454,50 @@ document.getElementById('btn-logout').addEventListener('click', () => {
         'A validade e a categoria da CNH do condutor estão de acordo com o veículo que está conduzindo?'
       ]
     },
+    moto: {
+      titulo:'Motocicleta', icone:'🏍️', ident:'placa', identLabel:'Placa', finalizaKm:true,
+      header:[
+        {k:'placa',       label:'Placa',        req:true},
+        {k:'moto',        label:'Moto / Modelo'},
+        {k:'matricula',   label:'Matrícula'},
+        {k:'km_inicial',  label:'KM inicial', tipo:'number', hint:'na abertura'},
+        {k:'km_final',    label:'KM final',   tipo:'number', hint:'no fim do dia — deixe em branco ao abrir'},
+        {k:'local',       label:'Local'}
+      ],
+      fotosObrig:[
+        {slot:'lateral_esq', label:'Lateral esquerda'},
+        {slot:'lateral_dir', label:'Lateral direita'},
+        {slot:'frente',      label:'Frente'},
+        {slot:'traseira',    label:'Traseira'},
+        {slot:'painel',      label:'Painel'}
+      ],
+      selfie:{slot:'selfie', label:'Selfie do colaborador com a moto'},
+      itens:[
+        'O óleo está dentro do nível e prazo de validade?',
+        'Setas dianteiras e traseiras estão funcionando?',
+        'Farol está funcionando, alto e baixo?',
+        'Lanternas traseiras e luz de freio estão funcionando?',
+        'As carenagens estão em bom estado e conservação?',
+        'Os retrovisores estão em bom estado para uso?',
+        'Cabo de embreagem está em bom estado para uso?',
+        'Cabo do acelerador está em bom estado para uso?',
+        'O kit da moto está em bom estado de uso?',
+        'O cabo de freio está em perfeito estado para uso?',
+        'As lonas de freio estão em bom estado para uso?',
+        'Os amortecedores estão livres de vazamento?',
+        'A partida elétrica encontra-se em bom estado para uso?',
+        'O velocímetro encontra-se funcionando?',
+        'A buzina encontra-se funcionando?',
+        'O painel de informações encontra-se funcionando?',
+        'A parte elétrica encontra-se funcionando?',
+        'A bateria encontra-se em bom estado para uso, carregada?',
+        'O braço de fixação encontra-se em bom estado para uso?',
+        'A moto encontra-se limpa e em bom estado de conservação?',
+        'Os pneus encontram-se em bom estado para uso, dentro do limite permitido (TWI)?',
+        'O baú da moto encontra-se em bom estado e com limpeza externa (5S)?',
+        'Os cones de sinalização estão perfeitos e disponíveis para uso?'
+      ]
+    },
     escada: {
       titulo:'Escadas e Passarelas', icone:'🪜', ident:'tag', identLabel:'Identificação/TAG',
       selfie:{slot:'selfie', label:'Selfie do colaborador com o equipamento'},
@@ -3465,7 +3509,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       itens:[
         'A escada simples possui comprimento máximo – 7m?',
         'A escada extensível possui comprimento máximo – 12m?',
-        'Possui os degraus em material não condutor?',
+        'Os degraus são de material não condutor (isolante)?',
         'Possui as condições originais do fabricante?',
         'Possui sapatas antiderrapantes?',
         'Possui sinalização da carga máxima?',
@@ -3484,16 +3528,16 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       ],
       itens:[
         'As costuras são de cores contrastantes e estão livres de rupturas?',
-        'O cinto está em boas condições e não possui sinais que já sofreu tensionamento de queda (costura de "marca de queda" solta)?',
+        'O cinto está em boas condições, sem sinais de tensionamento de queda (costura de "marca de queda" solta)?',
         'Os cintos são do tipo pára-quedista dotados de argolas, fivelas, mosquetões de aço forjado com trava dupla, duplo talabarte em "Y" com amortecedor e mosquetão de 3" com trava dupla?',
         'Para atividade de corte ou à quente o cinto é de material não combustível e está equipado com talabarte provido de alma de aço?',
         'Travas, molas e conexões dos mosquetões estão livres de folga?',
-        'Os ganchos e mosquetões não apresentam defeito pelo mau uso ou pelo uso excessivo?',
-        'Os ganchos travam, não se encontram amassados, tortos, gatilho emperrado, deformações, oxidações, etc?',
+        'Os ganchos e mosquetões estão em bom estado, sem defeitos por mau uso ou uso excessivo?',
+        'Os ganchos travam e estão sem amassados, empenos, gatilho emperrado, deformações ou oxidação?',
         'Corda ou fita do talabarte está livre de avarias e danos?',
-        'Os talabartes não apresentam costuras, desfiamento, fios rompidos?',
-        'As fitas não apresentam cortes, furos, queimaduras, desgaste excessivo (fitas puídas), nem terem sofrido contato com produtos químicos?',
-        'O absorvedor de energia não apresenta rompimento?',
+        'Os talabartes estão íntegros, sem costuras soltas, desfiamento ou fios rompidos?',
+        'As fitas estão íntegras, sem cortes, furos, queimaduras, desgaste excessivo (puídas) ou contato com produtos químicos?',
+        'O absorvedor de energia está em perfeito estado (sem rompimento)?',
         'Possui o talabarte de posicionamento?'
       ]
     },
@@ -3508,13 +3552,13 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       ],
       itens:[
         'A broca é adequada ao tipo de material a ser perfurado?',
-        'A broca não se encontra torta e está afiada?',
+        'A broca está reta (sem empeno) e afiada?',
         'Aterramento instalado adequadamente?',
         'Cabo com duplo isolamento e livre de emendas, avarias e danos?',
         'Corpo da máquina livre de avarias e danos?',
         'Existem chaves mandril apropriadas para troca da broca?',
         'Interruptor liga / desliga funcionando?',
-        'Não existem vibrações anormais quando em funcionamento?',
+        'A furadeira funciona sem vibrações anormais?',
         'O mandril está perfeito e sem dentes quebrados?',
         'Plug padrão industrial ou stack?',
         'Possui chave liga/desliga?',
@@ -3651,7 +3695,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       +'<div style="font-size:11px;color:var(--tx);font-weight:600;margin-bottom:4px">'+esc(label)+(obrig?' <span style="color:var(--r)">*</span>':'')
         +(dica?' <span style="color:var(--tx2);font-weight:400">'+esc(dica)+'</span>':'')+'</div>'
       +'<div class="fthumbs" data-fthumbs="'+gid+'" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:5px"></div>'
-      +'<label style="display:inline-block;background:var(--acc3);color:var(--acc);font-size:11px;font-weight:600;padding:6px 10px;border-radius:5px;cursor:pointer">'+(btnTxt||'📷 Adicionar foto')+'<input type="file" accept="image/*" capture="'+(facing||'environment')+'" data-fadd="'+gid+'" style="display:none"></label>'
+      +'<label style="display:inline-block;background:var(--acc3);color:var(--acc);font-size:11px;font-weight:600;padding:6px 10px;border-radius:5px;cursor:pointer">'+(btnTxt||'📷 Adicionar foto')+'<input type="file" accept="image/*"'+(facing==='livre'?'':' capture="'+(facing||'environment')+'"')+' data-fadd="'+gid+'" style="display:none"></label>'
       +'</div>';
   }
   function fthumb(dataUrl, n){
@@ -3732,14 +3776,14 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   function abrirFinalizar(row){
     if(!row) return; const d=CKL[row.tipo]||{};
     S={ fotos:{} };
-    const fotosEntrega = (row.tipo==='veiculo' && d.fotosObrig) ? (
+    const fotosEntrega = (d.finalizaKm && d.fotosObrig) ? (
       '<div style="margin-top:12px;border-top:1px solid var(--b);padding-top:10px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:3px">📷 Fotos de entrega <span style="color:var(--r)">*</span></div>'
-      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Fotografe o veículo na devolução — prova de que voltou como saiu de manhã. As mesmas 5 faces (pode tirar mais de uma; não dá pra apagar).</div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Fotografe na devolução — prova de que voltou como saiu de manhã. As mesmas faces da abertura (pode tirar mais de uma; não dá pra apagar).</div>'
       + d.fotosObrig.map(f=> fgrupo('entrega:'+f.slot, f.label, true)).join('')
-      + (d.selfie ? fgrupo('entrega_selfie:'+d.selfie.slot, '🤳 '+d.selfie.label, true, '(na devolução — câmera frontal)', 'user', '🤳 Tirar selfie') : '')
+      + (d.selfie ? fgrupo('entrega_selfie:'+d.selfie.slot, '🤳 '+d.selfie.label, true, '(na devolução — frente ou traseira)', 'livre', '🤳 Tirar selfie') : '')
       +'</div>'
     ) : '';
-    const campos = (row.tipo==='veiculo')
+    const campos = (d.finalizaKm)
       ? '<label style="display:block;font-size:12px;color:var(--tx);font-weight:600;margin-bottom:2px">KM final <span style="color:var(--r)">*</span></label>'
         +'<input id="fin-km" type="number" inputmode="numeric" style="width:100%;padding:9px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:14px">'
         +(row.km_inicial!=null?'<div style="font-size:11px;color:var(--tx2);margin-top:3px">KM inicial registrado: <strong>'+esc(row.km_inicial)+'</strong></div>':'')
@@ -3760,7 +3804,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     ov.querySelector('[data-ok]').onclick=async function(){
       const msg=ov.querySelector('#fin-msg'); msg.style.color='var(--r)';
       const payload={ acao:'finalizar', id:row.id, observacoes:(ov.querySelector('#fin-obs').value||'') };
-      if(row.tipo==='veiculo'){
+      if(d.finalizaKm){
         const km=ov.querySelector('#fin-km').value; if(!String(km).trim()){ msg.textContent='Informe o KM final'; return; } payload.km_final=km;
         for(const f of (d.fotosObrig||[])){ if(fcount('entrega:'+f.slot)<1){ msg.textContent='Falta a foto de entrega: '+f.label; return; } }
         if(d.selfie && fcount('entrega_selfie:'+d.selfie.slot)<1){ msg.textContent='Falta a selfie do colaborador na devolução.'; return; }
@@ -3790,7 +3834,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       +'<input data-hk="'+c.k+'" type="'+t+'" '+(t==='number'?'inputmode="numeric"':'')+' style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:13px">';
   }
 
-  // ---- Form padrão (veiculo/escada/cinto/furadeira) ----------------------
+  // ---- Form padrão (veiculo/moto/escada/cinto/furadeira) -----------------
   function renderPadrao(tipo,d){
     const hdr = d.header.map(campoInput).join('');
     const fotosObrig = d.fotosObrig ? (
@@ -3801,7 +3845,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     ) : '';
     // selfie do colaborador (prova de presença) — em TODOS os tipos
     const selfieB = d.selfie ? ('<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">🤳 Selfie <span style="color:var(--r)">*</span></div>'
-      + fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — câmera frontal)', 'user', '🤳 Tirar selfie') + '</div>') : '';
+      + fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — frente ou traseira)', 'livre', '🤳 Tirar selfie') + '</div>') : '';
 
     const itens = d.itens.map((q,i)=>{
       const id=i+1;
@@ -3948,7 +3992,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       +'<label style="display:block;font-size:11px;color:var(--tx2);margin:6px 0 2px">Descrição do trabalho</label>'
       +'<textarea data-descricao rows="2" style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:12px;font-family:inherit"></textarea>'
       + grupos
-      + (d.selfie ? ('<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">🤳 Selfie <span style="color:var(--r)">*</span></div>'+fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — câmera frontal)', 'user', '🤳 Tirar selfie')+'</div>') : '')
+      + (d.selfie ? ('<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">🤳 Selfie <span style="color:var(--r)">*</span></div>'+fgrupo('selfie:'+d.selfie.slot, d.selfie.label, true, '(prova de presença — frente ou traseira)', 'livre', '🤳 Tirar selfie')+'</div>') : '')
       +'<div style="margin-top:14px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:4px">📷 Fotos (opcional)</div>'
         +'<div class="pt-fotos" style="display:flex;gap:6px;flex-wrap:wrap"></div>'
         +'<label style="display:inline-block;margin-top:6px;background:var(--acc3);color:var(--acc);font-size:11px;font-weight:600;padding:6px 10px;border-radius:5px;cursor:pointer">+ Adicionar foto<input type="file" accept="image/*" capture="environment" data-ptfoto style="display:none"></label></div>'
