@@ -3418,7 +3418,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   // ---- Definições dos checklists -----------------------------------------
   const CKL = {
     veiculo: {
-      titulo:'Veículo Leve', icone:'🚗', ident:'placa', identLabel:'Placa',
+      titulo:'Veículo Leve', icone:'🚗', ident:'placa', identLabel:'Placa', finalizaKm:true,
       header:[
         {k:'placa',       label:'Placa',        req:true},
         {k:'carro',       label:'Carro / Modelo'},
@@ -3452,6 +3452,50 @@ document.getElementById('btn-logout').addEventListener('click', () => {
         'O sistema de registro/monitoramento de velocidade está funcionando?',
         'O documento do veículo (CRLV) está em dias?',
         'A validade e a categoria da CNH do condutor estão de acordo com o veículo que está conduzindo?'
+      ]
+    },
+    moto: {
+      titulo:'Motocicleta', icone:'🏍️', ident:'placa', identLabel:'Placa', finalizaKm:true,
+      header:[
+        {k:'placa',       label:'Placa',        req:true},
+        {k:'moto',        label:'Moto / Modelo'},
+        {k:'matricula',   label:'Matrícula'},
+        {k:'km_inicial',  label:'KM inicial', tipo:'number', hint:'na abertura'},
+        {k:'km_final',    label:'KM final',   tipo:'number', hint:'no fim do dia — deixe em branco ao abrir'},
+        {k:'local',       label:'Local'}
+      ],
+      fotosObrig:[
+        {slot:'lateral_esq', label:'Lateral esquerda'},
+        {slot:'lateral_dir', label:'Lateral direita'},
+        {slot:'frente',      label:'Frente'},
+        {slot:'traseira',    label:'Traseira'},
+        {slot:'painel',      label:'Painel'}
+      ],
+      selfie:{slot:'selfie', label:'Selfie do colaborador com a moto'},
+      itens:[
+        'O óleo está dentro do nível e prazo de validade?',
+        'Setas dianteiras e traseiras estão funcionando?',
+        'Farol está funcionando, alto e baixo?',
+        'Lanternas traseiras e luz de freio estão funcionando?',
+        'As carenagens estão em bom estado e conservação?',
+        'Os retrovisores estão em bom estado para uso?',
+        'Cabo de embreagem está em bom estado para uso?',
+        'Cabo do acelerador está em bom estado para uso?',
+        'O kit da moto está em bom estado de uso?',
+        'O cabo de freio está em perfeito estado para uso?',
+        'As lonas de freio estão em bom estado para uso?',
+        'Os amortecedores estão livres de vazamento?',
+        'A partida elétrica encontra-se em bom estado para uso?',
+        'O velocímetro encontra-se funcionando?',
+        'A buzina encontra-se funcionando?',
+        'O painel de informações encontra-se funcionando?',
+        'A parte elétrica encontra-se funcionando?',
+        'A bateria encontra-se em bom estado para uso, carregada?',
+        'O braço de fixação encontra-se em bom estado para uso?',
+        'A moto encontra-se limpa e em bom estado de conservação?',
+        'Os pneus encontram-se em bom estado para uso, dentro do limite permitido (TWI)?',
+        'O baú da moto encontra-se em bom estado e com limpeza externa (5S)?',
+        'Os cones de sinalização estão perfeitos e disponíveis para uso?'
       ]
     },
     escada: {
@@ -3732,14 +3776,14 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   function abrirFinalizar(row){
     if(!row) return; const d=CKL[row.tipo]||{};
     S={ fotos:{} };
-    const fotosEntrega = (row.tipo==='veiculo' && d.fotosObrig) ? (
+    const fotosEntrega = (d.finalizaKm && d.fotosObrig) ? (
       '<div style="margin-top:12px;border-top:1px solid var(--b);padding-top:10px"><div style="font-weight:700;font-size:13px;color:var(--tx);margin-bottom:3px">📷 Fotos de entrega <span style="color:var(--r)">*</span></div>'
-      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Fotografe o veículo na devolução — prova de que voltou como saiu de manhã. As mesmas 5 faces (pode tirar mais de uma; não dá pra apagar).</div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:8px">Fotografe na devolução — prova de que voltou como saiu de manhã. As mesmas faces da abertura (pode tirar mais de uma; não dá pra apagar).</div>'
       + d.fotosObrig.map(f=> fgrupo('entrega:'+f.slot, f.label, true)).join('')
       + (d.selfie ? fgrupo('entrega_selfie:'+d.selfie.slot, '🤳 '+d.selfie.label, true, '(na devolução — frente ou traseira)', 'livre', '🤳 Tirar selfie') : '')
       +'</div>'
     ) : '';
-    const campos = (row.tipo==='veiculo')
+    const campos = (d.finalizaKm)
       ? '<label style="display:block;font-size:12px;color:var(--tx);font-weight:600;margin-bottom:2px">KM final <span style="color:var(--r)">*</span></label>'
         +'<input id="fin-km" type="number" inputmode="numeric" style="width:100%;padding:9px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:14px">'
         +(row.km_inicial!=null?'<div style="font-size:11px;color:var(--tx2);margin-top:3px">KM inicial registrado: <strong>'+esc(row.km_inicial)+'</strong></div>':'')
@@ -3760,7 +3804,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     ov.querySelector('[data-ok]').onclick=async function(){
       const msg=ov.querySelector('#fin-msg'); msg.style.color='var(--r)';
       const payload={ acao:'finalizar', id:row.id, observacoes:(ov.querySelector('#fin-obs').value||'') };
-      if(row.tipo==='veiculo'){
+      if(d.finalizaKm){
         const km=ov.querySelector('#fin-km').value; if(!String(km).trim()){ msg.textContent='Informe o KM final'; return; } payload.km_final=km;
         for(const f of (d.fotosObrig||[])){ if(fcount('entrega:'+f.slot)<1){ msg.textContent='Falta a foto de entrega: '+f.label; return; } }
         if(d.selfie && fcount('entrega_selfie:'+d.selfie.slot)<1){ msg.textContent='Falta a selfie do colaborador na devolução.'; return; }
@@ -3790,7 +3834,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       +'<input data-hk="'+c.k+'" type="'+t+'" '+(t==='number'?'inputmode="numeric"':'')+' style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:13px">';
   }
 
-  // ---- Form padrão (veiculo/escada/cinto/furadeira) ----------------------
+  // ---- Form padrão (veiculo/moto/escada/cinto/furadeira) -----------------
   function renderPadrao(tipo,d){
     const hdr = d.header.map(campoInput).join('');
     const fotosObrig = d.fotosObrig ? (
