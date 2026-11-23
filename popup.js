@@ -3424,7 +3424,6 @@ document.getElementById('btn-logout').addEventListener('click', () => {
         {k:'carro',       label:'Carro / Modelo'},
         {k:'matricula',   label:'Matrícula'},
         {k:'km_inicial',  label:'KM inicial', tipo:'number', hint:'na abertura'},
-        {k:'km_final',    label:'KM final',   tipo:'number', hint:'no fim do dia — deixe em branco ao abrir'},
         {k:'local',       label:'Local'}
       ],
       fotosObrig:[
@@ -3461,7 +3460,6 @@ document.getElementById('btn-logout').addEventListener('click', () => {
         {k:'moto',        label:'Moto / Modelo'},
         {k:'matricula',   label:'Matrícula'},
         {k:'km_inicial',  label:'KM inicial', tipo:'number', hint:'na abertura'},
-        {k:'km_final',    label:'KM final',   tipo:'number', hint:'no fim do dia — deixe em branco ao abrir'},
         {k:'local',       label:'Local'}
       ],
       fotosObrig:[
@@ -3571,8 +3569,6 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       campos:[
         {k:'data_inicial', label:'Data inicial', tipo:'date'},
         {k:'hora_inicial', label:'Hora inicial', tipo:'time'},
-        {k:'data_final',   label:'Data final',   tipo:'date', hint:'no fim do dia'},
-        {k:'hora_final',   label:'Hora final',   tipo:'time', hint:'no fim do dia'},
         {k:'empresa',      label:'Nome da empresa'},
         {k:'encarregado',  label:'Encarregado(s)'},
         {k:'local',        label:'Local de trabalho', req:true},
