@@ -3413,7 +3413,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   'use strict';
   if (window.__cklInit) return; window.__cklInit = true;
 
-  const APP_VER = 'ckl-v1';
+  const APP_VER = 'ckl-v2';
 
   // ---- Definições dos checklists -----------------------------------------
   const CKL = {
@@ -3570,10 +3570,13 @@ document.getElementById('btn-logout').addEventListener('click', () => {
         {k:'data_inicial', label:'Data inicial', tipo:'date'},
         {k:'hora_inicial', label:'Hora inicial', tipo:'time'},
         {k:'empresa',      label:'Nome da empresa'},
-        {k:'encarregado',  label:'Encarregado(s)'},
+        {k:'encarregado',  label:'Encarregado responsável', req:true},
         {k:'local',        label:'Local de trabalho', req:true},
-        {k:'n_funcionarios', label:'Nº de funcionários', tipo:'number'}
+        {k:'hora_prevista_fim', label:'Término previsto (mesmo turno)', tipo:'time', req:true, hint:'NR-35: a PT vale só p/ o turno'},
+        {k:'ar_referencia', label:'Análise de Risco / procedimento', hint:'nº ou nome, se houver'}
       ],
+      // NR-35 35.5.8.1 c: a PT deve conter a relação de TODOS os envolvidos
+      envolvidos:true,
       descricao:true,
       atividade:['Altura e/ou telhados, níveis elevados, escadas, postes, torres ou outros','Trabalhos próximos a eletricidade'],
       maodeobra:['Interna','Externa','Outros'],
@@ -3986,6 +3989,7 @@ document.getElementById('btn-logout').addEventListener('click', () => {
       + simnao
       +'<div style="font-weight:700;font-size:12px;color:var(--tx);margin:12px 0 2px">Dados</div>'
       + campos
+      + (d.envolvidos ? envolvidosBloco() : '')
       +'<label style="display:block;font-size:11px;color:var(--tx2);margin:6px 0 2px">Descrição do trabalho</label>'
       +'<textarea data-descricao rows="2" style="width:100%;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:12px;font-family:inherit"></textarea>'
       + grupos
@@ -4001,9 +4005,50 @@ document.getElementById('btn-logout').addEventListener('click', () => {
     return ov;
   }
 
+  // ---- PT: relação de envolvidos (NR-35 35.5.8.1 c) -----------------------
+  // O colaborador logado entra automaticamente; os demais são adicionados com
+  // nome + matrícula/função. Nº de funcionários = tamanho da lista (não digita).
+  function envolvidosBloco(){
+    return '<div style="margin-top:12px"><div style="font-weight:700;font-size:12px;color:var(--tx);margin-bottom:2px">👷 Envolvidos na atividade <span style="color:var(--r)">*</span> <span data-env-cnt style="color:var(--tx2);font-weight:400"></span></div>'
+      +'<div style="font-size:11px;color:var(--tx2);margin-bottom:6px">Todos que vão executar a atividade (você já está incluído).</div>'
+      +'<div data-env-lista style="display:flex;flex-direction:column;gap:6px"></div>'
+      +'<div style="display:flex;gap:6px;margin-top:6px">'
+        +'<input data-env-nome placeholder="Nome completo" style="flex:2;min-width:0;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:13px">'
+        +'<input data-env-mat placeholder="Matrícula/função" style="flex:1;min-width:0;padding:8px;border:1px solid var(--b2);border-radius:6px;background:var(--bg);color:var(--tx);font-size:13px">'
+        +'<button type="button" data-env-add style="padding:8px 12px;border:none;border-radius:6px;background:var(--acc3);color:var(--acc);font-weight:700;font-size:13px;cursor:pointer">+</button>'
+      +'</div></div>';
+  }
+  function wireEnvolvidos(box){
+    const lista=box.querySelector('[data-env-lista]'); if(!lista) return;
+    if(!Array.isArray(S.envolvidos)) S.envolvidos=[{ nome:tecNome()||'Colaborador logado', matricula:'', proprio:true }];
+    const draw=()=>{
+      lista.innerHTML=S.envolvidos.map((e,i)=>
+        '<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--b);border-radius:6px;font-size:12px;color:var(--tx)">'
+        +'<span style="flex:1">'+esc(e.nome)+(e.matricula?' <span style="color:var(--tx2)">· '+esc(e.matricula)+'</span>':'')+(e.proprio?' <span style="color:var(--tx2)">(você)</span>':'')+'</span>'
+        +(e.proprio?'':'<button type="button" data-env-del="'+i+'" style="border:none;background:none;color:var(--r);font-size:15px;cursor:pointer" aria-label="Remover">✕</button>')
+        +'</div>').join('');
+      const c=box.querySelector('[data-env-cnt]'); if(c) c.textContent='('+S.envolvidos.length+')';
+      S.header.n_funcionarios=String(S.envolvidos.length);
+      lista.querySelectorAll('[data-env-del]').forEach(b=>b.onclick=()=>{ S.envolvidos.splice(+b.getAttribute('data-env-del'),1); draw(); });
+    };
+    const nome=box.querySelector('[data-env-nome]'), mat=box.querySelector('[data-env-mat]');
+    const add=()=>{
+      const n=String(nome.value||'').trim().replace(/\s+/g,' ');
+      if(n.length<3){ say('Digite o nome do envolvido','err'); nome.focus(); return; }
+      if(S.envolvidos.some(e=>e.nome.toLowerCase()===n.toLowerCase())){ say('Já está na lista','err'); return; }
+      S.envolvidos.push({ nome:n, matricula:String(mat.value||'').trim() });
+      nome.value=''; mat.value=''; nome.focus(); draw();
+    };
+    box.querySelector('[data-env-add]').onclick=add;
+    nome.onkeydown=mat.onkeydown=(ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); add(); } };
+    draw();
+  }
+
   function wirePT(ov,d){
     const box=ov.querySelector('.ckl-box');
     S.ptFotos=[];
+    S.envolvidos=null;
+    if(d.envolvidos) wireEnvolvidos(box);
     ov.querySelector('[data-x]').onclick=()=>confirmClose(ov);
     ov.querySelector('[data-cancel]').onclick=()=>confirmClose(ov);
     box.querySelectorAll('[data-hk]').forEach(inp=>inp.oninput=()=>{ S.header[inp.getAttribute('data-hk')]=inp.value; });
@@ -4037,13 +4082,27 @@ document.getElementById('btn-logout').addEventListener('click', () => {
   async function enviarPT(ov,d){
     const box=ov.querySelector('.ckl-box'); const msg=box.querySelector('#ckl-msg');
     const fail=(t)=>{ msg.style.color='var(--r)'; msg.textContent=t; };
-    if(!String(S.header.local||'').trim()) return fail('Preencha: Local de trabalho');
+    // obrigatórios do formulário (campos com req) — NR-35 35.5.8.1
+    const faltando=d.campos.filter(c=>c.req && !String(S.header[c.k]||'').trim()).map(c=>c.label);
+    if(faltando.length) return fail('Preencha: '+faltando.join(', '));
+    if(!S.pt.atividade.length) return fail('Marque a identificação da atividade.');
+    if(d.envolvidos){
+      const pend=box.querySelector('[data-env-nome]'); if(pend && String(pend.value||'').trim()) return fail('Toque em "+" para incluir o envolvido digitado.');
+      if(!Array.isArray(S.envolvidos)||!S.envolvidos.length) return fail('Inclua os envolvidos na atividade.');
+    }
+    if(!S.pt.perigos.length) return fail('Marque ao menos um perigo potencial.');
+    if(!S.pt.epis.length)    return fail('Marque os EPIs necessários.');
+    if(!S.pt.medidas.length) return fail('Marque as medidas preventivas.');
+    if(S.header.hora_inicial && S.header.hora_prevista_fim && S.header.hora_prevista_fim<=S.header.hora_inicial)
+      return fail('O término previsto deve ser depois da hora inicial (a PT vale só para o turno).');
     if(d.selfie && fcount('selfie:'+d.selfie.slot)<1) return fail('Falta a selfie do colaborador no local.');
     if(!S.assina||!S.assina.feito||!S.assina.dataUrl) return fail('Assine no campo de assinatura.');
     if(!S.aceite) return fail('Marque o termo de aceite para assinar.');
     const cabecalho=Object.assign({}, S.header, {
       atividade:S.pt.atividade, maodeobra:S.pt.maodeobra, simnao:S.pt.simnao,
-      perigos:S.pt.perigos, epis:S.pt.epis, medidas:S.pt.medidas, descricao:S.descricao||''
+      perigos:S.pt.perigos, epis:S.pt.epis, medidas:S.pt.medidas, descricao:S.descricao||'',
+      envolvidos:(S.envolvidos||[]).map(e=>({ nome:e.nome, matricula:e.matricula||'', proprio:!!e.proprio })),
+      n_funcionarios:String((S.envolvidos||[]).length||'')
     });
     const identificacao=String(S.header.local||'').trim();
     const assin=await montarAssinatura({ tipo:'pt', identificacao, cabecalho, respostas:[], observacoes:S.obs||'' });
